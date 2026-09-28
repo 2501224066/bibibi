@@ -1,0 +1,68 @@
+{
+  "description": "项目配置文件",
+  "miniprogramRoot": "miniprogram/",
+  "compileType": "miniprogram",
+  "setting": {
+    "useCompilerPlugins": [
+      "typescript",
+      "less"
+    ],
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
+    },
+    "coverView": false,
+    "postcss": false,
+    "minified": false,
+    "enhance": false,
+    "showShadowRootInWxmlPanel": false,
+    "packNpmRelationList": [],
+    "ignoreUploadUnusedFiles": false,
+    "compileHotReLoad": false,
+    "skylineRenderEnable": true,
+    "es6": false,
+    "uglifyFileName": false,
+    "uploadWithSourceMap": true,
+    "packNpmManually": false,
+    "minifyWXSS": true,
+    "localPlugins": false,
+    "condition": false,
+    "compileWorklet": false,
+    "disableUseStrict": false,
+    "minifyWXML": true,
+    "lessSetting": {
+      "commonUseFilePath": "app.less"
+    }
+  },
+  "simulatorType": "wechat",
+  "simulatorPluginLibVersion": {},
+  "condition": {},
+  "srcMiniprogramRoot": "miniprogram/",
+  "editorSetting": {
+    "tabIndent": "insertSpaces",
+    "tabSize": 2
+  },
+  "libVersion": "2.32.3",
+  "packOptions": {
+    "ignore": [
+      { "type": "suffix", "value": ".DS_Store" },
+      { "type": "suffix", "value": ".md" }
+    ],
+    "include": [
+      {
+        "value": "assets/demo-rainbow.json",
+        "type": "file"
+      },
+      {
+        "value": "assets/drums/*",
+        "type": "glob"
+      },
+      {
+        "value": "assets/piano/*",
+        "type": "glob"
+      }
+    ]
+  },
+  "appid": "wxf5ddf7821d0067dc"
+}

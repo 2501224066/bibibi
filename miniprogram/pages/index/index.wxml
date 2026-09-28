@@ -1,0 +1,83 @@
+<wxs module="clock">
+function display(value) {
+  var seconds = Math.floor(parseFloat(value) || 0);
+  var minutes = Math.floor(seconds / 60);
+  seconds = seconds % 60;
+  return (minutes < 10 ? "0" : "") + minutes + ":" + (seconds < 10 ? "0" : "") + seconds;
+}
+module.exports = { display: display };
+</wxs>
+
+<view class="page {{libraryOpen ? 'library-open' : ''}}">
+  <view class="studio">
+    <view class="console"><view class="track-panel">
+      <view class="screen-glass">
+        <view wx:if="{{isRecording || isPlaying || libraryOpen}}" class="panel-heading">
+          <view class="display-label"><view class="status-led {{isRecording ? 'is-recording' : ''}}"></view><text>{{libraryOpen ? 'LIBRARY' : isRecording ? 'REC' : isPlaying ? 'PLAY' : 'STANDBY'}}</text></view>
+          <view class="timer"><text class="elapsed">{{clock.display(elapsedLabel)}}</text></view>
+        </view>
+        <view wx:if="{{!libraryOpen}}" class="track-screen">
+          <view wx:for="{{tracks}}" wx:key="id" wx:if="{{item.notes.length || isRecording && recordingTrackId === item.id}}" class="track-row {{recordingTrackId === item.id ? 'current-track' : ''}}">
+            <button class="track-loop {{item.loop ? 'is-on' : ''}}" data-id="{{item.id}}" catchtap="toggleTrackLoop" disabled="{{isRecording || isPlaying || !item.notes.length}}" aria-label="音轨{{index + 1}}循环播放"><view class="loop-box"><image class="track-loop-icon" src="/assets/loop{{item.loop ? '-active' : ''}}.svg"/></view></button>
+            <view class="note-lane">
+              <view class="grid-line grid-one"></view><view class="grid-line grid-two"></view><view class="grid-line grid-three"></view>
+              <view wx:if="{{!item.bars.length}}" class="empty-track"></view>
+              <view wx:for="{{item.bars}}" wx:for-item="bar" wx:key="id" class="note-bar" style="left: {{bar.left}}%; width: {{bar.width}}%; top: {{bar.top}}%;"></view>
+              <view wx:if="{{isRecording && recordingTrackId === item.id || (isPlaying || isLooping) && playbackProgress[item.id] >= 0}}" class="playhead" style="left: {{isRecording && recordingTrackId === item.id ? progress : playbackProgress[item.id]}}%;"></view>
+            </view>
+            <view class="track-meta {{!item.notes.length ? 'is-empty' : ''}}"><text>{{item.name || '未录制'}}</text><text wx:if="{{item.notes.length}}" class="track-duration">{{clock.display(item.durationLabel)}}</text></view>
+            <button class="track-check {{item.checked ? 'is-on' : ''}}" data-id="{{item.id}}" catchtap="toggleTrack" disabled="{{isRecording || isPlaying || !item.notes.length}}" aria-label="音轨{{index + 1}}{{item.checked ? '已选中' : '未选中'}}"><view class="check-box"><view wx:if="{{item.checked}}" class="check-mark"></view></view></button>
+          </view>
+        </view>
+        <scroll-view wx:else class="screen-library" scroll-y="{{!isMixSwiping}}" enhanced="{{true}}" show-scrollbar="{{false}}">
+          <view wx:if="{{libraryError}}" class="library-empty">{{libraryError}}</view>
+          <view wx:elif="{{!savedMixes.length}}" class="library-empty"><text>NO SAVED TRACKS</text><text class="library-empty-caption">录制后使用底部保存键</text></view>
+          <view wx:for="{{savedMixes}}" wx:key="id" class="screen-library-row {{selectedMixId === item.id ? 'is-selected' : ''}}" data-id="{{item.id}}" bindtap="selectSavedMix" aria-role="button" aria-label="{{item.name}}，{{item.durationLabel}}"><view class="library-led"></view><text class="saved-name">{{item.name}}</text><text class="saved-duration">{{item.durationLabel}}</text></view>
+        </scroll-view>
+        <view class="screen-footer">
+          <text wx:if="{{libraryOpen}}" class="library-count">{{savedMixes.length}} SAVED</text>
+          <view wx:else class="screen-control-icons"><image src="/assets/{{instrument}}-active.svg" mode="aspectFit"/><text class="screen-range">{{octaveIndex === 0 ? 'L' : octaveIndex === 1 ? 'M' : 'H'}}</text><image class="screen-vibrato {{vibrato ? 'is-on' : 'is-off'}}" src="/assets/vibrato{{vibrato ? '-active' : ''}}.svg" mode="aspectFit"/></view>
+          <view class="screen-meter"><view class="meter-bar meter-1"></view><view class="meter-bar meter-2"></view><view class="meter-bar meter-3"></view><view class="meter-bar meter-4"></view><view class="meter-bar meter-5"></view><view class="meter-bar meter-6"></view><view class="meter-bar meter-7"></view><view class="meter-lamp"></view></view>
+        </view>
+      </view>
+      <view class="bezel-strip" aria-hidden="true"><view class="screw"></view><view class="maker-mark"><view></view><view></view><view></view><view></view><view></view></view><text>MASTER</text><view class="screw"></view></view>
+    </view></view>
+
+    <view class="speaker-grille" aria-hidden="true"></view>
+
+    <view class="control-deck">
+      <view class="disc-panel">
+        <view class="disc-frame" style="width: {{discSize}}px; height: {{discSize}}px;"><view class="touch-disc" catchtouchstart="onPadStart" catchtouchmove="onKeyMove" catchtouchend="onKeyEnd" catchtouchcancel="onKeyEnd">
+          <view wx:for="{{keys}}" wx:key="label" class="music-key" style="clip-path: polygon({{item.polygon}});" aria-role="button" aria-label="{{instrument === 'drums' ? item.drumLabel : '音符' + item.pitchLabel}}"></view>
+          <view class="disc-inner"></view><view class="disc-marker {{activeIndex >= 0 ? 'is-lit' : ''}}"></view>
+        </view></view>
+      </view>
+
+      <view class="right-controls">
+        <view class="knobs-row">
+          <button class="knob-control" bindtap="cycleInstrument" disabled="{{isRecording || isPlaying}}" aria-label="音色{{instrumentName}}，点击切换"><view class="hardware-knob tone-knob" style="transform: rotate({{-45 + soundPosition * .9}}deg);"><view class="knob-slot"></view></view></button>
+          <button class="knob-control" bindtap="cycleOctave" disabled="{{isRecording || isPlaying}}" aria-label="音域{{octaveNames[octaveIndex]}}，点击切换"><view class="hardware-knob range-knob" style="transform: rotate({{-45 + octaveIndex * 45}}deg);"><view class="knob-slot"></view></view></button>
+          <button class="knob-control" bindtap="toggleVibrato" disabled="{{isPlaying || instrument !== 'synth'}}" aria-label="颤音{{vibrato ? '开启' : '关闭'}}"><view class="hardware-knob vibrato-knob {{vibrato ? 'is-on' : ''}}"><view class="knob-slot"></view></view></button>
+        </view>
+        <view class="transport-area">
+          <view class="transport-controls">
+          <button class="library-button {{libraryOpen ? 'is-on' : ''}} {{libraryGlow ? 'is-glowing' : ''}}" bindtap="toggleLibrary" bindanimationend="finishLibraryGlow" disabled="{{isRecording}}" aria-label="{{libraryOpen ? '关闭音库' : '打开音库'}}"><image class="transport-icon" src="/assets/library-note.svg" mode="aspectFit"/></button>
+            <button class="record-button {{isRecording ? 'is-recording' : ''}}" bindtap="toggleRecording" disabled="{{libraryOpen}}" aria-label="{{isRecording ? '结束录制' : '开始录制'}}"><view class="record-dot"></view></button>
+            <button class="mix-button {{isPlaying ? 'is-playing' : ''}}" bindtap="togglePlayback" disabled="{{libraryOpen || !isPlaying && (isRecording || !(tracks[0].checked || tracks[1].checked || tracks[2].checked || tracks[3].checked || tracks[4].checked))}}" aria-label="{{isPlaying ? '停止播放' : '播放'}}"><image class="transport-icon" src="/assets/control-{{isPlaying ? 'stop' : 'play'}}.svg" mode="aspectFit"/></button>
+          </view>
+        </view>
+      </view>
+
+      <view class="bottom-actions">
+        <button class="round-action bottom-save" bindtap="openSaveDialog" disabled="{{isRecording || !hasTracks}}" aria-label="保存当前音轨"><view class="action-cap"></view><text>SAVE</text></button>
+        <button class="round-action bottom-delete" bindtap="deleteCurrent" disabled="{{isRecording || libraryOpen && !selectedMixId || !libraryOpen && !hasTracks}}" aria-label="删除"><view class="action-cap"></view><text>DELETE</text></button>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{showSaveDialog}}" class="save-overlay" catchtouchmove="stopDialogEvent" bindtap="closeSaveDialog"><view class="save-dialog" catchtap="stopDialogEvent" aria-role="dialog" aria-label="保存音轨">
+    <text class="save-dialog-title">保存音轨</text><text class="save-dialog-caption">为这段旋律取个名字</text>
+    <input class="save-name-input" value="{{saveName}}" bindinput="onSaveNameInput" bindconfirm="saveMix" placeholder="音轨名称" maxlength="30" focus="{{showSaveDialog}}" confirm-type="done" adjust-position="true" aria-label="音轨名称"/>
+    <text class="save-error">{{saveError}}</text><view class="save-dialog-actions"><button class="save-cancel" bindtap="closeSaveDialog" disabled="{{isSaving}}">取消</button><button class="save-confirm" bindtap="saveMix" disabled="{{isSaving}}">{{isSaving ? '保存中' : '保存'}}</button></view>
+  </view></view>
+</view>
