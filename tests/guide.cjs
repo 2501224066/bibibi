@@ -1,0 +1,134 @@
+// Run: node tests/guide.cjs
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const vm = require('node:vm')
+const { stripTypeScriptTypes } = require('node:module')
+let definition, seen = false, demoTick, recordTick
+const audio = { currentTime: 0 }
+const demoNotes = []
+const sandbox = { setInterval(callback, interval) { if (interval === 40) demoTick = callback; else recordTick = callback; return interval }, clearInterval() {}, Component(value) { definition = value }, wx: {
+  getStorageSync: () => seen,
+  getFileSystemManager: () => ({ readFileSync: () => fs.readFileSync('miniprogram/assets/demo-rainbow.json', 'utf8') }),
+  setStorageSync(key, value) { assert.equal(key, 'bibibi.guide.v1'); seen = value },
+  getSystemInfoSync: () => ({ windowWidth: 375, windowHeight: 667, statusBarHeight: 20 }),
+} }
+vm.runInNewContext(stripTypeScriptTypes(fs.readFileSync('miniprogram/pages/index/index.ts', 'utf8')), sandbox)
+const page = { data: structuredClone(definition.data), ...definition.methods,
+  setData(value, callback) { Object.assign(this.data, value); callback?.() },
+  measureKeys() {}, onKeyEnd() {}, playKnobBeep() {},
+  createSelectorQuery() { return { select() { return this }, boundingClientRect() { return this }, exec(callback) { callback([{ left: 180, top: 440, bottom: 480, width: 50, height: 40 }, { left: 32, top: 360, bottom: 380, width: 90, height: 20 }]) } } }
+}
+definition.lifetimes.ready.call(page)
+assert.equal(page.data.guideVisible, true)
+assert.equal(page.data.guideStep, 0)
+assert.equal(page.data.guideRect.top, 435, 'knob window does not include the space between targets')
+assert.ok(page.data.guideRect.top + page.data.guideRect.height >= 480, 'knob remains interactive')
+assert.ok(page.data.guideCardTop > 485, 'instruction card sits below knob')
+page.nextGuide()
+assert.equal(page.data.guideStep, 0, 'must operate the highlighted control first')
+page.cycleInstrument()
+assert.equal(page.data.guideDone, true)
+assert.ok(page.data.guideFeedback.includes(page.data.instrumentName))
+page.nextGuide()
+page.cycleOctave()
+assert.equal(page.data.guideDone, true)
+page.nextGuide()
+page.getAudioContext = () => audio
+page.toggleVibrato()
+assert.equal(page.data.guideDone, true)
+page.nextGuide()
+assert.equal(page.data.instrument, 'piano')
+assert.equal(page.data.octaveIndex, 1)
+assert.equal(page.data.guideSteps[page.data.guideStep].action, 'record')
+page.createVoice = (...args) => { demoNotes.push(args); return { stop() {} } }
+page.toggleRecording()
+assert.equal(page.data.isRecording, true)
+page.nextGuide()
+assert.equal(page.data.guideDemoPlaying, false, 'recording opens the demo step without starting it')
+assert.equal(page.data.guideSteps[page.data.guideStep].action, 'melody')
+const melodyCardTop = page.data.guideCardTop
+assert.equal(page.data.guideDemoPlaying, false)
+page.nextGuide()
+assert.equal(page.data.guideDemoPlaying, true, 'the user starts the demo with its button')
+assert.equal(demoNotes.length, 14)
+assert.deepEqual(demoNotes.map(args => args[9]), [60, 62, 64, 60, 60, 62, 64, 60, 64, 65, 67, 64, 65, 67])
+page.nextGuide()
+assert.equal(demoNotes.length, 14, 'cannot duplicate a running demonstration')
+audio.currentTime = .9
+demoTick()
+assert.equal(page.data.guideExpectedKey, 4)
+audio.currentTime = 1.2
+demoTick()
+assert.equal(page.data.guideExpectedKey, -1, 'key releases in the gap between notes')
+assert.ok(Math.abs(demoNotes[10][5] - .72) < 1e-9, 'phrase ending has a two-beat note')
+audio.currentTime = 7
+demoTick()
+assert.equal(page.data.guideDemoPlaying, false)
+assert.equal(page.data.guideSteps[page.data.guideStep].action, 'melody', 'demo completion waits for Next')
+assert.equal(page.data.guideDone, true, 'demo completion enables Next')
+assert.equal(page.data.isRecording, true, 'recording continues while waiting for Next')
+page.onPadStart({ touches: [{ clientX: 100, clientY: 100 }] })
+assert.equal(page.data.guideSteps[page.data.guideStep].action, 'melody', 'tapping disc after demo does not advance step')
+page.nextGuide()
+assert.equal(page.data.guideSteps[page.data.guideStep].action, 'stop-record')
+assert.equal(page.data.isRecording, true, 'entering stop-record waits for the record button')
+assert.equal(page.data.guideDone, false)
+page.nextGuide()
+assert.equal(page.data.guideSteps[page.data.guideStep].action, 'stop-record', 'cannot skip stopping the recording')
+page.toggleRecording()
+assert.equal(page.data.isRecording, false)
+assert.equal(page.data.guideCardTop, melodyCardTop, 'card remains in place when window switches to stop recording')
+assert.equal(page.data.tracks[0].notes.length, 14, 'demonstration is actually recorded')
+assert.equal(page.data.guideDone, true)
+assert.equal(page.data.guideExpectedKey, -1)
+page.openLibrary = () => page.setData({ libraryOpen: true })
+page.closeLibrary = () => page.setData({ libraryOpen: false })
+page.nextGuide()
+assert.equal(page.data.guideSteps[page.data.guideStep].action, 'save')
+page.enterGuideStep(page.data.guideSteps.findIndex(step => step.action === 'library'))
+page.toggleLibrary()
+assert.equal(page.data.guideDone, true)
+page.nextGuide()
+assert.ok(page.data.savedMixes.some(mix => mix.id === 'demo-rainbow-midi-v1'))
+page.selectSavedMix({ currentTarget: { dataset: { id: 'demo-rainbow-midi-v1' } } })
+assert.equal(page.data.guideDone, true)
+assert.equal(page.data.selectedMixId, 'demo-rainbow-midi-v1')
+page.nextGuide()
+page.createVoice = () => ({ stop() {} })
+page.togglePlayback()
+assert.equal(page.data.isPlaying, true)
+assert.equal(page.data.guideDone, true, 'actual playback completes the final step')
+page.nextGuide()
+assert.equal(page.data.guideVisible, false)
+assert.equal(seen, true)
+page.stopPlayback()
+definition.lifetimes.ready.call(page)
+assert.equal(page.data.guideVisible, false, 'completed guide is not shown automatically')
+page.startGuide()
+assert.equal(page.data.guideVisible, true, 'help reopens guide')
+page.finishGuide()
+page.data.isRecording = true
+page.startGuide()
+assert.equal(page.data.guideVisible, false, 'recording is not interrupted')
+console.log('PASS: first visit, positioning, previous/next, completion memory, manual replay and recording guard')
+
+const markup = fs.readFileSync('miniprogram/pages/index/index.wxml', 'utf8')
+assert.ok(markup.includes('<block wx:if="{{guideVisible}}">'), 'guide must not have a full-screen hit target')
+assert.ok(!markup.includes('class="guide-focus"'), 'no transparent view may cover the interactive hole')
+for (const step of definition.data.guideSteps) {
+  assert.ok(!step.selector.includes(':nth-child'), 'selector query uses direct classes')
+  assert.ok(markup.includes(step.selector.slice(1)), 'guide target exists in markup')
+}
+console.log('PASS: guide targets use direct classes and the interaction hole has no overlay element')
+
+const masks = sandbox.guideMasks(375, 667, [
+  { left: 175, top: 435, width: 60, height: 50 },
+  { left: 27, top: 355, width: 100, height: 30 },
+])
+const covered = (x, y) => masks.some(r => x >= r.left && x < r.left + r.width && y >= r.top && y < r.top + r.height)
+assert.equal(covered(200, 460), false, 'knob is interactive')
+assert.equal(covered(50, 370), false, 'screen icons are visible')
+assert.equal(covered(150, 410), true, 'space between windows stays masked')
+assert.equal(covered(10, 10), true)
+assert.equal(masks.reduce((area, r) => area + r.width * r.height, 0), 375 * 667 - 60 * 50 - 100 * 30)
+console.log('PASS: separate knob/status windows, masked gap and card below knob')

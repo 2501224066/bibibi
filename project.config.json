@@ -46,23 +46,30 @@
   "libVersion": "2.32.3",
   "packOptions": {
     "ignore": [
-      { "type": "suffix", "value": ".DS_Store" },
-      { "type": "suffix", "value": ".md" }
+      {
+        "value": ".DS_Store",
+        "type": "suffix"
+      },
+      {
+        "value": ".md",
+        "type": "suffix"
+      },
+      {
+        "value": "assets/drums",
+        "type": "folder"
+      },
+      {
+        "value": "assets/piano",
+        "type": "folder"
+      }
     ],
     "include": [
       {
         "value": "assets/demo-rainbow.json",
         "type": "file"
-      },
-      {
-        "value": "assets/drums/*",
-        "type": "glob"
-      },
-      {
-        "value": "assets/piano/*",
-        "type": "glob"
       }
     ]
   },
-  "appid": "wxf5ddf7821d0067dc"
+  "appid": "wxc65e1d3877c35b54",
+  "isGameTourist": false
 }

@@ -1,6 +1,6 @@
 {
   "libVersion": "2.32.3",
-  "projectname": "stylophone-kids",
+  "projectname": "bibibi",
   "setting": {
     "urlCheck": true,
     "coverView": false,
@@ -16,6 +16,8 @@
     "checkInvalidKey": true,
     "useStaticServer": false,
     "useLanDebug": false,
-    "ignoreDevUnusedFiles": true
-  }
+    "ignoreDevUnusedFiles": true,
+    "useGlassEaselForWxml": false
+  },
+  "condition": {}
 }

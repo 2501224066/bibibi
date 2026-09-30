@@ -1,4 +1,4 @@
-"""Convert the supplied Rainbow MIDI to a 90-second, three-track app fixture.
+"""Convert the supplied Rainbow MIDI to a full-length app fixture.
 Usage: python3 scripts/prepare-midi.py /path/to/彩虹-周杰伦.mid
 No quantization or transposition; this fixture maps flute to synth and piano to piano.
 """
@@ -95,8 +95,8 @@ for tick, track, kind, channel, values in sorted(events, key=lambda event: (even
             continue
         start_tick, velocity = queue.popleft()
         start = milliseconds(start_tick)
-        end = min(90000, milliseconds(tick))
-        if end <= start or start >= 90000 or not velocity:
+        end = milliseconds(tick)
+        if end <= start or not velocity:
             continue
         pitch = values[0]
         # Index is only for the nine-zone visualization; midiNote drives exact playback.
@@ -105,17 +105,18 @@ for tick, track, kind, channel, values in sorted(events, key=lambda event: (even
             duration=round(end - start, 3), octave=max(0, min(2, (pitch - 48) // 12)),
             velocity=round(velocity, 6), vibrato=False))
 assert not any(active.values()), 'Unterminated notes in source'
+duration = round(max(note['start'] + note['duration'] for sequence in notes.values() for note in sequence), 3)
 tracks = []
 for (track, channel), sequence in sorted(notes.items()):
     program = programs.get(channel, 0)
     assert channel != 9 and program in (0, 73), f'Unexpected instrument {program}'
     sequence.sort(key=lambda note: note['start'])
-    tracks.append(dict(instrument='synth' if program == 73 else 'piano', duration=90000,
+    tracks.append(dict(instrument='synth' if program == 73 else 'piano', duration=duration,
                        checked=True, loop=False, notes=sequence))
 assert len(tracks) <= 5
 while len(tracks) < 5:
     tracks.append(dict(instrument=None, duration=0, notes=[]))
-fixture = dict(id='demo-rainbow-midi-v1', name='彩虹 · MIDI前90秒', duration=90000, tracks=tracks)
+fixture = dict(id='demo-rainbow-midi-v1', name='彩虹 · 完整版', duration=duration, tracks=tracks)
 output = Path(__file__).resolve().parents[1] / 'miniprogram/assets/demo-rainbow.json'
 output.write_text(json.dumps(fixture, ensure_ascii=False, separators=(',', ':')), encoding='utf8')
 print(json.dumps(dict(source=source.name, sourceSeconds=round(milliseconds(max(event[0] for event in events)) / 1000, 2),
