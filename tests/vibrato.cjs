@@ -20,25 +20,22 @@ vm.runInNewContext(stripTypeScriptTypes(fs.readFileSync('miniprogram/pages/index
 const page = { data: structuredClone(definition.data), setData(value) { Object.assign(this.data, value) }, ...definition.methods }
 page.getAudioContext()
 for (const instrument of ['drums', 'piano', 'synth']) {
-  page.setData({ instrument, vibrato: false })
-  page.toggleVibrato()
-  assert.equal(page.data.vibrato, true, instrument)
-  const start = oscillators.length
-  const voice = page.createVoice(instrument, 0, 1, true, 3, .2, .7, .4)
-  const sources = oscillators.slice(start)
-  const lfo = sources.at(-1)
-  assert.equal(lfo.frequency.value, 7)
-  assert.ok(lfo.wave, 'recorded phase is restored')
-  const depth = lfo.connections[0]
-  assert.ok(Math.abs(depth.gain.events[0].value - 15) < 1e-9)
-  for (const source of sources.slice(0, -1)) assert.ok(depth.connections.includes(source.detune))
-  voice.stop()
-  assert.ok(sources.every(source => source.disconnected), 'LFO and carriers are cleaned up')
-  page.toggleVibrato()
-  assert.equal(page.data.vibrato, false)
-  const dryStart = oscillators.length
-  const dry = page.createVoice(instrument, 0, 1, false, 3, .2)
-  assert.equal(oscillators.length - dryStart, sources.length - 1, 'disabled effect has no LFO')
-  dry.stop()
+  for (const savedVibrato of [false, true]) {
+    const start = oscillators.length
+    const voice = page.createVoice(instrument, 0, 1, savedVibrato, 3, .2, .7, .4)
+    const sources = oscillators.slice(start)
+    const lfos = sources.filter(source => source.frequency.value === 7)
+    assert.equal(lfos.length, instrument === 'synth' ? 1 : 0, 'only synth has automatic vibrato, regardless of saved toggle')
+    if (instrument === 'synth') {
+      const lfo = lfos[0]
+      assert.ok(lfo.wave, 'recorded synth phase is restored')
+      const depth = lfo.connections[0]
+      if (savedVibrato) assert.ok(Math.abs(depth.gain.events[0].value - 15) < 1e-9)
+      assert.ok(depth.connections.includes(sources[0].detune))
+    }
+    voice.stop()
+    assert.ok(sources.every(source => source.disconnected), 'LFO and carriers are cleaned up')
+  }
 }
-console.log('PASS: all three instruments toggle vibrato, modulate every carrier, restore recorded phase and clean up the LFO')
+assert.equal(page.toggleVibrato, undefined, 'the user-facing vibrato toggle is removed')
+console.log('PASS: automatic synth vibrato, dry piano/drums, saved synth phase and oscillator cleanup')

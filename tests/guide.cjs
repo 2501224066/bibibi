@@ -15,7 +15,7 @@ const sandbox = { setInterval(callback, interval) { if (interval === 40) demoTic
 vm.runInNewContext(stripTypeScriptTypes(fs.readFileSync('miniprogram/pages/index/index.ts', 'utf8')), sandbox)
 const page = { data: structuredClone(definition.data), ...definition.methods,
   setData(value, callback) { Object.assign(this.data, value); callback?.() },
-  measureKeys() {}, onKeyEnd() {}, playKnobBeep() {},
+  measureKeys() {}, onKeyEnd() {}, playKnobBeep() {}, startMetronome() {},
   createSelectorQuery() { return { select() { return this }, boundingClientRect() { return this }, exec(callback) { callback([{ left: 180, top: 440, bottom: 480, width: 50, height: 40 }, { left: 32, top: 360, bottom: 380, width: 90, height: 20 }]) } } }
 }
 definition.lifetimes.ready.call(page)
@@ -23,18 +23,23 @@ assert.equal(page.data.guideVisible, true)
 assert.equal(page.data.guideStep, 0)
 assert.equal(page.data.guideRect.top, 435, 'knob window does not include the space between targets')
 assert.ok(page.data.guideRect.top + page.data.guideRect.height >= 480, 'knob remains interactive')
-assert.ok(page.data.guideCardTop > 485, 'instruction card sits below knob')
+assert.ok(page.data.guideCardTop + page.data.guideCardHeight <= 423, 'instruction card sits above the knob with a gap')
+assert.ok(page.data.guideCardTop >= 68, 'instruction card stays below the navigation')
+assert.equal(667 - page.data.guideCardBottom, page.data.guideRect.top - 12, 'the card bottom stays 12px above the knob regardless of content height')
 page.nextGuide()
 assert.equal(page.data.guideStep, 0, 'must operate the highlighted control first')
 page.cycleInstrument()
+assert.equal(page.data.controlFlashes.tone, 1, 'changing instrument flashes its screen icon')
 assert.equal(page.data.guideDone, true)
 assert.ok(page.data.guideFeedback.includes(page.data.instrumentName))
 page.nextGuide()
 page.cycleOctave()
+assert.equal(page.data.controlFlashes.range, 1, 'changing octave flashes the range marker')
 assert.equal(page.data.guideDone, true)
 page.nextGuide()
 page.getAudioContext = () => audio
-page.toggleVibrato()
+page.cycleMetronome()
+assert.equal(page.data.controlFlashes.metronome, 1, 'changing tempo flashes its screen icon')
 assert.equal(page.data.guideDone, true)
 page.nextGuide()
 assert.equal(page.data.instrument, 'piano')
@@ -131,4 +136,40 @@ assert.equal(covered(50, 370), false, 'screen icons are visible')
 assert.equal(covered(150, 410), true, 'space between windows stays masked')
 assert.equal(covered(10, 10), true)
 assert.equal(masks.reduce((area, r) => area + r.width * r.height, 0), 375 * 667 - 60 * 50 - 100 * 30)
-console.log('PASS: separate knob/status windows, masked gap and card below knob')
+console.log('PASS: separate knob/status windows, masked gap and card above knob')
+
+const flashes = page.data.controlFlashes.tone
+page.flashScreenControl('tone')
+page.flashScreenControl('tone')
+assert.equal(page.data.controlFlashes.tone, flashes + 2, 'repeated changes restart the glow animation')
+
+assert.equal(page.data.screenGlitch, 0, 'screen starts without a glitch')
+page.triggerScreenGlitch()
+page.triggerScreenGlitch()
+assert.equal(page.data.screenGlitch, 2, 'each logo tap restarts the screen effect')
+page.finishScreenGlitch()
+assert.equal(page.data.screenGlitch, 0, 'animation completion removes the effect before library content is recreated')
+page.toggleLibrary()
+page.toggleLibrary()
+assert.equal(page.data.screenGlitch, 0, 'opening and closing the library does not trigger the logo effect')
+assert.ok(markup.includes('class="panel-heading" bindanimationend="finishScreenGlitch"'), 'the stable screen header clears the effect on completion')
+
+sandbox.wx.getSystemInfoSync = () => ({ windowWidth: 320, windowHeight: 568, statusBarHeight: 20 })
+page.setData({ guideVisible: true })
+for (const action of ['tone', 'octave', 'metronome']) {
+  page.setData({ guideStep: page.data.guideSteps.findIndex(step => step.action === action) })
+  page.positionGuide()
+  assert.ok(page.data.guideCardTop >= 68)
+  assert.ok(page.data.guideCardTop + page.data.guideCardHeight <= page.data.guideRect.top - 12, 'all knob cards fit above their targets on a small screen')
+  assert.ok(page.data.guideCardTop + page.data.guideCardHeight <= 556)
+  assert.equal(568 - page.data.guideCardBottom, page.data.guideRect.top - 12, 'short cards stay anchored close to the knob')
+}
+
+for (const action of ['melody', 'stop-record']) {
+  page.setData({ guideVisible: true, guideRecording: true, isRecording: false,
+    guideStep: page.data.guideSteps.findIndex(step => step.action === action) })
+  definition.pageLifetimes.show.call(page)
+  assert.equal(page.data.guideSteps[page.data.guideStep].action, 'record', 'interrupted guide recording can restart after returning')
+  assert.equal(page.data.guideRecording, false)
+  assert.equal(page.data.guideDone, false)
+}

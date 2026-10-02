@@ -41,3 +41,20 @@ assert.equal(JSON.stringify(page.data.tracks), JSON.stringify(original), 'origin
 page.openLibrary(); page.closeLibrary()
 assert.equal(JSON.stringify(page.data.tracks), JSON.stringify(original), 'opening and closing without choosing a song is non-destructive')
 console.log('PASS: library button stays on, manual/natural stop shows list, closing restores original tracks and selection')
+
+let created = 0, stopped = 0, playbackError
+sandbox.wx.showToast = value => { playbackError = value.title }
+page.data.tracks[0].notes.push({ ...page.data.tracks[0].notes[0], start: 100 })
+page.createVoice = () => {
+  if (++created === 2) throw new Error('audio unavailable')
+  return { stop() { stopped++ } }
+}
+page.togglePlayback()
+assert.equal(page.data.isPlaying, false)
+assert.equal(stopped, 1, 'partial scheduling is cleaned up when a later note fails')
+assert.equal(playbackError, '播放失败，请重试')
+page.animateSavedMix()
+assert.equal(page.data.libraryGlow, true, 'successful saving visibly highlights the library button')
+page.finishLibraryAnimation()
+assert.equal(page.data.libraryGlow, false)
+console.log('PASS: playback failure cleanup and save feedback')

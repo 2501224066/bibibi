@@ -14,7 +14,7 @@ vm.runInNewContext(stripTypeScriptTypes(fs.readFileSync('miniprogram/pages/index
 const scheduled = []
 const page = { data: structuredClone(definition.data), ...definition.methods,
   setData(value, callback) { Object.assign(this.data, value); callback?.() },
-  getAudioContext: () => audio,
+  getAudioContext: () => audio, measureKeys() {},
   createVoice(...args) { scheduled.push(args); return { stop() {}, release() {} } },
 }
 page.startRecording()
@@ -38,18 +38,21 @@ assert.ok(stored)
 page.loadLibrary()
 assert.equal(page.data.libraryError, '')
 assert.equal(page.data.savedMixes[0].duration, 3602000)
+page.openLibrary()
+page.selectSavedMix({ currentTarget: { dataset: { id: page.data.savedMixes[0].id } } })
 page.togglePlayback()
 assert.ok(scheduled.some(args => args[5] === 3600), 'full held note is scheduled')
 assert.ok(scheduled.some(args => args[4] > 3600), 'late note is scheduled')
 page.stopPlayback()
+page.closeLibrary()
 page.setData({ instrument: 'drums' })
 page.startRecording()
 now += 7200000
 page.playKey(0)
 page.onKeyEnd()
 page.stopRecording()
-assert.ok(page.data.tracks[1].notes[0].start >= 7200000)
-assert.ok(page.data.tracks[1].notes[0].duration > 0, 'drum tail is not clipped by old limit')
+assert.ok(page.data.tracks[0].notes[0].start >= 7200000)
+assert.ok(page.data.tracks[0].notes[0].duration > 0, 'drum tail is not clipped by old limit')
 const invalid = structuredClone(page.data.tracks)
 invalid[0].notes[0].duration = Infinity
 assert.throws(() => sandbox.restoreTracks(invalid), /Invalid note/)

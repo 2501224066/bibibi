@@ -36,6 +36,7 @@ const shareTimelineResult = definition.methods.onShareTimeline()
 assert.ok(shareTimelineResult.title && shareTimelineResult.title.includes('哔哔'))
 
 const pageInstance = {
+  data: structuredClone(definition.data),
   ...definition.methods,
   setData() {},
   loadLibrary() {},

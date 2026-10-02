@@ -2,17 +2,16 @@ type InstrumentId = 'drums' | 'piano' | 'synth'
 type NoteEvent = { index: number; start: number; duration: number; octave: number; vibrato: boolean; vibratoAge?: number; vibratoPhase?: number; velocity?: number; midiNote?: number }
 type Track = { id: number; instrument: InstrumentId | null; name: string; octaveLabel: string; selected: boolean; duration: number; durationLabel: string; notes: NoteEvent[]; bars: { id: number; left: number; width: number; top: number }[] }
 type SavedMix = { id: string; name: string; duration: number; durationLabel: string; tracks: Track[] }
-type SaveFlight = { left: number; top: number; width: number; height: number; x: number; y: number; scale: number; name: string; tracks: Track[] }
 const GUIDE_KEY = 'bibibi.guide.v1'
 const GUIDE_MELODY = [[0, 1], [2, 1], [4, 1], [0, 1], [0, 1], [2, 1], [4, 1], [0, 1], [4, 1], [5, 1], [7, 2], [4, 1], [5, 1], [7, 2]]
 const GUIDE_STEPS = [
-  { selector: '.tone-knob', action: 'tone', title: '音色旋钮：切换乐器', text: '点击 MIC 1 切换一次音色，观察屏幕左下方的图标变化。' },
-  { selector: '.range-knob', action: 'octave', title: '音域旋钮：切换高低音', text: '点击 MIC 2，观察屏幕上的 L / M / H 音域标记变化。' },
-  { selector: '.vibrato-knob', action: 'vibrato', title: '颤音旋钮：开关颤音', text: '点击 MIXER，观察旋钮角度和屏幕颤音图标的变化。' },
-  { selector: '.record-button', action: 'record', title: '录制按钮：开始录音', text: '点击红色录制按钮，开始记录圆盘演奏。' },
-  { selector: '.disc-frame', action: 'melody', title: '音乐操作区', text: '点击圆盘或“示范”，自动弹奏一段《两只老虎》，看看音符与圆盘分区的对应关系。' },
+  { selector: '.tone-knob', action: 'tone', title: '音色旋钮：切换乐器', text: '点击 音色 切换一次音色，观察屏幕左下方的图标变化。' },
+  { selector: '.range-knob', action: 'octave', title: '音域旋钮：切换高低音', text: '点击 音域，观察屏幕上的 L / M / H 音域标记变化。' },
+  { selector: '.metronome-knob', action: 'metronome', title: '节拍旋钮：设置节奏', text: '点击节拍，在关闭、60、90、120 BPM 之间切换。听听节拍声，观察屏幕左下角的速度标记。节拍声不会录入作品。' },
+  { selector: '.record-button', action: 'record', title: '录制按钮：开始录音', text: '点击红色录制按钮，开始记录方格演奏。' },
+  { selector: '.disc-frame', action: 'melody', title: '音乐操作区', text: '点击方格或“示范”，自动弹奏一段《两只老虎》，看看音符与方格的对应关系。' },
   { selector: '.record-button', action: 'stop-record', title: '录制按钮：结束录音', text: '示范完成，请点击红色录制按钮结束录制。' },
-  { selector: '.bottom-save', action: 'save', title: '保存按钮：保存刚录制的旋律', text: '点击 SAVE，保存刚才录下的《两只老虎》。' },
+  { selector: '.bottom-save', action: 'save', title: '保存按钮：保存刚录制的旋律', text: '点击保存，保存刚才录下的《两只老虎》。' },
   { selector: '.library-button', action: 'library', title: '音库按钮：查看已保存曲目', text: '点击亮起的音库按钮，看看可以试听的曲目。' },
   { selector: '.screen-library', action: 'rainbow', title: '曲目列表：选择作品', text: '点击曲目即可选中，请试着选择《彩虹》。' },
   { selector: '.mix-button', action: 'play', title: '播放按钮：播放或停止', text: '点击右侧播放按钮，听听完整的《彩虹》，观察音轨和实时音符。' },
@@ -52,7 +51,8 @@ const INSTRUMENTS: { id: InstrumentId; name: string }[] = [
 ]
 // Legacy pitches preserve recordings made before the chromatic layout.
 const FREQUENCIES = [349.23, 392, 440, 493.88, 523.25, 587.33, 261.63, 293.66, 329.63, 698.46, 783.99, 880]
-const RING_KEYS = 12
+const METRONOME_BPMS = [0, 60, 90, 120]
+const PAD_CELLS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
 // Raised about 5 dB after device listening feedback; velocity remains linear.
 const INSTRUMENT_LEVELS = { synth: .063, piano: .074 }
 const DRUM_SOUNDS = [
@@ -70,9 +70,9 @@ const DRUM_SOUNDS = [
   { name: '水镲', kind: 'metal', frequency: 520, duration: .8, level: 0.0613 },
 ]
 const NOTE_STEPS = [5, 7, 9, 11, 12, 14, 0, 2, 4, 17, 19, 21]
-// Physical keys: cymbals across the upper arc, drums across the lower arc.
+// Keep drum sound indices stable as the physical layout changes.
 // Recorded drum indices continue to identify sounds, independent of layout.
-const DRUM_KEY_ORDER = [0, 1, 2, 3, 4, 5, 10, 11, 6, 7, 9, 8]
+const DRUM_KEY_ORDER = [2, 3, 4, 5, 10, 11, 0, 1, 6, 7, 9, 8]
 const NOTE_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
 function shiftedKey(index: number, octave = 1) {
   const note = NOTE_NAMES[index]
@@ -82,29 +82,17 @@ function shiftedPitch(index: number, octave: number): number {
   return 48 + octave * 12 + index
 }
 const activeVoices = new Set<Voice>()
-function arcPoints(radius: number, start: number, end: number): string[] {
-  const steps = Math.ceil(Math.abs(end - start) / 3)
-  return Array.from({ length: steps + 1 }, (_, index) => {
-    const angle = (start + (end - start) * index / steps) * Math.PI / 180
-    return `${(50 + radius * Math.cos(angle)).toFixed(3)}% ${(50 + radius * Math.sin(angle)).toFixed(3)}%`
-  })
-}
-
-function keyPolygon(index: number): string {
-  if (index === RING_KEYS - 1) return [
-    ...arcPoints(18, 105, 435), ...arcPoints(50, 75, 105),
-  ].join(', ')
-  const start = 105 + index * 30
-  const end = start + 30
-  return [...arcPoints(50, start, end), ...arcPoints(18, end, start)].join(', ')
-}
-
-function padKeyAt(x: number, y: number): number {
-  const radius = Math.sqrt(x * x + y * y)
-  if (radius > 1) return -1
-  const angle = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360
-  if (radius <= .36 || (angle >= 75 && angle <= 105)) return RING_KEYS - 1
-  return Math.min(RING_KEYS - 2, Math.floor(((angle - 105 + 360) % 360) / 30))
+function padKeyAt(x: number, y: number, width = 0, height = 0): number {
+  if (!Number.isFinite(x) || !Number.isFinite(y) || x < -1 || x >= 1 || y < -1 || y >= 1) return -1
+  const gapX = width > 0 ? 8 / width : 0
+  const gapY = height > 0 ? 8 / height : 0
+  const cellWidth = (2 - gapX * 5) / 6
+  const cellHeight = (2 - gapY) / 2
+  if (cellWidth <= 0 || cellHeight <= 0) return -1
+  const column = Math.floor((x + 1) / (cellWidth + gapX))
+  const row = Math.floor((y + 1) / (cellHeight + gapY))
+  if (x + 1 - column * (cellWidth + gapX) >= cellWidth || y + 1 - row * (cellHeight + gapY) >= cellHeight) return -1
+  return PAD_CELLS[row * 6 + column]
 }
 
 function noteBars(notes: NoteEvent[], duration = TIMELINE_MIN_DURATION) {
@@ -164,7 +152,6 @@ function restoreTracks(value: unknown): Track[] {
 
 let mixGesture: { id: string; x: number; y: number; offset: number; axis: string } | null = null
 let suppressMixTap = false
-let saveEffectId = 0
 let context: any = null
 let masterGain: any = null
 let liveVoice: Voice | null = null
@@ -172,6 +159,8 @@ let liveSynthVoice: Voice | null = null
 let vibratoStartedAt: number | null = null
 let playbackVoices: Voice[] = []
 let timer: ReturnType<typeof setInterval> | null = null
+let metronomeTimer: ReturnType<typeof setInterval> | null = null
+let metronomeGain: any = null
 let playbackTimer: ReturnType<typeof setInterval> | null = null
 let startedAt = 0
 let pendingNote: NoteEvent | null = null
@@ -190,26 +179,28 @@ Component({
   data: {
     guideVisible: false, guideStep: 0, guideSteps: GUIDE_STEPS, guideDone: false, guideFeedback: '', guideDemoPlaying: false, guideExpectedKey: -1, guideRecording: false, guideSaving: false,
     guideMasks: [] as GuideRect[], guideCardHeight: 260,
-    guideRect: { left: 0, top: 0, width: 0, height: 0 }, guideCardTop: 100,
+    guideRect: { left: 0, top: 0, width: 0, height: 0 }, guideCardTop: 100, guideCardBottom: -1,
     laneWidth: 240,
-    topInset: 52, bottomInset: 24, discSize: 200, speakerRows: [] as { id: number; dots: number[] }[],
+    topInset: 52, bottomInset: 24, speakerRows: [] as { id: number; dots: number[] }[],
     libraryButtonTop: 52, libraryButtonRight: 104, libraryButtonSize: 32,
     instrument: 'piano' as InstrumentId, instrumentName: '钢琴',
     instruments: INSTRUMENTS, soundPosition: 50, isSoundDragging: false,
-    keys: Array.from({ length: RING_KEYS }, (_, index) => {
-      const degrees = index === RING_KEYS - 1 ? 90 : 120 + index * 30
-      const angle = degrees * Math.PI / 180
-      return { ...shiftedKey(index), polygon: keyPolygon(index), drumLabel: DRUM_SOUNDS[DRUM_KEY_ORDER[index]].name, drumIconIndex: DRUM_KEY_ORDER[index],
-        labelLeft: 50 + 42 * Math.cos(angle), labelTop: 50 + 42 * Math.sin(angle), labelRotation: degrees - 90 }
+    controlFlashes: { tone: 0, range: 0, metronome: 0 },
+    screenGlitch: 0,
+    padCells: PAD_CELLS,
+    keys: Array.from({ length: 12 }, (_, index) => {
+      const cell = PAD_CELLS.indexOf(index)
+      return { ...shiftedKey(index), drumLabel: DRUM_SOUNDS[DRUM_KEY_ORDER[index]].name, drumIconIndex: DRUM_KEY_ORDER[index],
+        labelLeft: (cell % 6 + .5) * 100 / 6, labelTop: (Math.floor(cell / 6) + .5) * 50 }
     }),
     tracks: [] as Track[],
     recordingTrackId: -1,
     midiDemoVersion: 0, libraryOpen: false, isScreenMoving: false, savedMixes: [] as SavedMix[], selectedMixId: '', libraryError: '', scrollTrackIntoView: '',
     swipedMixId: '', mixSwipeOffset: 0, isMixSwiping: false,
     showSaveDialog: false, saveName: '', saveError: '', isSaving: false,
-    saveFlight: null as SaveFlight | null, libraryGlow: false, libraryLift: false,
+    libraryGlow: false, libraryLift: false,
     octaveLetters: ['L', 'M', 'H'],
-    octaveNames: ['低', '中', '高'], octaveIndex: 1, vibrato: false,
+    octaveNames: ['低', '中', '高'], octaveIndex: 1, metronomeIndex: 0, metronomeBpm: 0,
     activeIndex: -1, activeNote: '', activeDrumIcon: '', isRecording: false, isPlaying: false,
     hasTracks: false, progress: 0, playbackProgress: [] as number[], playbackNoteLabels: [] as string[], playbackDrumIcons: [] as string[], elapsedLabel: '0.0s', timelineSeconds: TIMELINE_MIN_DURATION / 1000,
     hasSelectedTracks: false,
@@ -242,6 +233,7 @@ Component({
     detached() {
       this.stopGuideDemo()
       this.clearSaveEffect()
+      this.stopMetronome()
       this.pauseSession()
       if (context && context.close) context.close()
       context = null
@@ -250,8 +242,15 @@ Component({
     },
   },
   pageLifetimes: {
-    show() { this.setupShareMenu() },
-    hide() { this.stopGuideDemo(); this.clearSaveEffect(); this.pauseSession() },
+    show() {
+      this.setupShareMenu()
+      this.startMetronome()
+      if (this.data.guideVisible && this.data.guideRecording && !this.data.isRecording) {
+        this.setData({ guideRecording: false })
+        this.enterGuideStep(GUIDE_STEPS.findIndex(step => step.action === 'record'))
+      }
+    },
+    hide() { this.stopGuideDemo(); this.clearSaveEffect(); this.stopMetronome(); this.pauseSession() },
     resize() { this.measureKeys(); if (this.data.guideVisible) this.positionGuide() },
   },
   methods: {
@@ -263,7 +262,7 @@ Component({
     },
     positionGuide(keepCard = false) {
       const step = this.data.guideStep
-      const showScreenIcons = ['tone', 'octave', 'vibrato'].includes(GUIDE_STEPS[step].action)
+      const showScreenIcons = ['tone', 'octave', 'metronome'].includes(GUIDE_STEPS[step].action)
       const query = this.createSelectorQuery().select(GUIDE_STEPS[step].selector).boundingClientRect()
       if (showScreenIcons) query.select('.screen-control-icons').boundingClientRect()
       query.exec(results => {
@@ -271,7 +270,7 @@ Component({
         const rect = results[0]
         const info = wx.getSystemInfoSync()
         if (!rect || !rect.width) {
-          this.setData({ guideRect: { left: 0, top: 0, width: 0, height: 0 }, guideCardTop: Math.max(info.statusBarHeight + 48, (info.windowHeight - 190) / 2), guideMasks: guideMasks(info.windowWidth, info.windowHeight, []), guideCardHeight: 260 })
+          this.setData({ guideRect: { left: 0, top: 0, width: 0, height: 0 }, guideCardTop: Math.max(info.statusBarHeight + 48, (info.windowHeight - 190) / 2), guideCardBottom: -1, guideMasks: guideMasks(info.windowWidth, info.windowHeight, []), guideCardHeight: 260 })
           return
         }
         const padded = (target: WechatMiniprogram.BoundingClientRectCallbackResult): GuideRect => {
@@ -283,11 +282,13 @@ Component({
         const icons = showScreenIcons ? results[1] : null
         if (icons && icons.width) holes.push(padded(icons))
         const bottom = target.top + target.height
-        const cardTop = showScreenIcons ? bottom + 12 : target.top >= info.statusBarHeight + 300 ? target.top - 260 : bottom + 14
-        const top = showScreenIcons ? cardTop : Math.max(info.statusBarHeight + 48, Math.min(cardTop, info.windowHeight - 260))
+        const cardTop = showScreenIcons ? target.top - 272 : target.top >= info.statusBarHeight + 300 ? target.top - 260 : bottom + 14
+        const top = Math.max(info.statusBarHeight + 48, Math.min(cardTop, info.windowHeight - 260))
+        const cardHeight = showScreenIcons ? Math.max(0, Math.min(260, target.top - info.statusBarHeight - 48 - 12)) : Math.max(60, info.windowHeight - top - 12)
         this.setData({
           guideRect: target, guideMasks: guideMasks(info.windowWidth, info.windowHeight, holes),
-          guideCardTop: keepCard ? this.data.guideCardTop : top, guideCardHeight: keepCard ? this.data.guideCardHeight : Math.max(60, info.windowHeight - top - 12),
+          guideCardTop: keepCard ? this.data.guideCardTop : top, guideCardHeight: keepCard ? this.data.guideCardHeight : cardHeight,
+          guideCardBottom: keepCard ? this.data.guideCardBottom : showScreenIcons ? info.windowHeight - target.top + 12 : -1,
         })
       })
     },
@@ -305,7 +306,7 @@ Component({
           if (this.data.libraryOpen) this.closeLibrary()
           this.setInstrument(1)
           this.setOctave(1)
-          this.setVibrato({ detail: { value: false } })
+          this.setMetronome(0)
         }
         if (action === 'library' && this.data.libraryOpen) this.closeLibrary()
         if (action === 'rainbow') {
@@ -568,7 +569,7 @@ Component({
       this.setData({ showSaveDialog: true, saveName: guideSaving ? '两只老虎' : '', saveError: '', ...(guideSaving ? { guideSaving: true, guideVisible: false } : {}) })
     },
     closeSaveDialog() {
-      if (!this.data.isSaving) this.setData({ showSaveDialog: false, saveError: '', ...(this.data.guideSaving ? { guideSaving: false, guideVisible: true, guideFeedback: '保存已取消，点击 SAVE 可重新保存。' } : {}) })
+      if (!this.data.isSaving) this.setData({ showSaveDialog: false, saveError: '', ...(this.data.guideSaving ? { guideSaving: false, guideVisible: true, guideFeedback: '保存已取消，点击保存 可重新保存。' } : {}) })
     },
     onSaveNameInput(event: WechatMiniprogram.Input) {
       this.setData({ saveName: event.detail.value, saveError: '' })
@@ -596,34 +597,17 @@ Component({
         }, () => {
           if (continueGuide) this.enterGuideStep(GUIDE_STEPS.findIndex(item => item.action === 'library'))
         })
-        wx.hideKeyboard({ complete: () => this.animateSavedMix(name, tracks) })
+        wx.hideKeyboard({ complete: () => this.animateSavedMix() })
       } catch (_) {
         this.setData({ saveError: '保存失败，请检查本机存储空间后重试' })
       } finally { this.setData({ isSaving: false }) }
     },
-    animateSavedMix(name: string, tracks: Track[]) {
-      this.clearSaveEffect()
-      const effectId = saveEffectId
-      this.createSelectorQuery().select('.track-panel').boundingClientRect().select('.library-button').boundingClientRect().exec(results => {
-        if (effectId !== saveEffectId) return
-        const source = results[0] as WechatMiniprogram.BoundingClientRectCallbackResult
-        const target = results[1] as WechatMiniprogram.BoundingClientRectCallbackResult
-        if (!source || !source.width || !target || !target.width) { this.setData({ libraryGlow: true }); return }
-        this.setData({ saveFlight: {
-          left: source.left, top: source.top, width: source.width, height: source.height,
-          x: target.left + target.width / 2 - source.left - source.width / 2,
-          y: target.top + target.height / 2 - source.top - source.height / 2,
-          scale: target.width / Math.max(source.width, source.height), name, tracks,
-        } })
-      })
-    },
-    finishSaveFlight() {
-      if (this.data.saveFlight) this.setData({ saveFlight: null, libraryGlow: true })
+    animateSavedMix() {
+      this.setData({ libraryGlow: true })
     },
     finishLibraryAnimation() { this.setData({ libraryGlow: false, libraryLift: false }) },
     clearSaveEffect() {
-      saveEffectId++
-      this.setData({ saveFlight: null, libraryGlow: false, libraryLift: false })
+      this.setData({ libraryGlow: false, libraryLift: false })
     },
     selectSavedMix(event: WechatMiniprogram.TouchEvent) {
       if (suppressMixTap) { suppressMixTap = false; return }
@@ -638,11 +622,21 @@ Component({
       if (mix.id === 'demo-rainbow-midi-v1') this.guideAction('rainbow', '已选中《彩虹》。')
     },
     stopDialogEvent() {},
+    triggerScreenGlitch() {
+      this.setData({ screenGlitch: this.data.screenGlitch + 1 })
+    },
+    finishScreenGlitch() {
+      this.setData({ screenGlitch: 0 })
+    },
+    flashScreenControl(control: 'tone' | 'range' | 'metronome') {
+      this.setData({ controlFlashes: { ...this.data.controlFlashes, [control]: this.data.controlFlashes[control] + 1 } })
+    },
     setOctave(index: number) {
       if (!Number.isInteger(index) || index < 0 || index > 2 || index === this.data.octaveIndex) return
       this.vibrate('medium')
       this.onKeyEnd()
       this.setData({ octaveIndex: index, keys: this.data.keys.map((key, keyIndex) => ({ ...key, ...shiftedKey(keyIndex, index) })) })
+      this.flashScreenControl('range')
     },
     cycleOctave() {
       const previous = this.data.octaveIndex
@@ -650,25 +644,48 @@ Component({
       if (this.data.octaveIndex !== previous) this.playKnobBeep(988)
       this.guideAction('octave', `音域已修改为${this.data.octaveNames[this.data.octaveIndex]}。`)
     },
-    toggleVibrato() {
-      const previous = this.data.vibrato
-      this.setVibrato({ detail: { value: !this.data.vibrato } })
-      if (this.data.vibrato !== previous) this.playKnobBeep(988)
-      this.guideAction('vibrato', this.data.vibrato ? '颤音已开启。' : '颤音已关闭。')
+    cycleMetronome() {
+      this.setMetronome((this.data.metronomeIndex + 1) % METRONOME_BPMS.length)
+      this.guideAction('metronome', this.data.metronomeBpm ? `节拍已设为 ${this.data.metronomeBpm} BPM。` : '节拍已关闭。')
     },
-    setVibrato(event: { detail: { value: boolean } }) {
-      if (this.data.vibrato === event.detail.value) return
+    setMetronome(index: number) {
+      if (!Number.isInteger(index) || index < 0 || index >= METRONOME_BPMS.length || index === this.data.metronomeIndex) return
+      this.stopMetronome()
+      this.setData({ metronomeIndex: index, metronomeBpm: METRONOME_BPMS[index] })
+      this.flashScreenControl('metronome')
       this.vibrate('light')
-      const audioCtx = this.getAudioContext()
-      vibratoStartedAt = event.detail.value ? (audioCtx && audioCtx.currentTime !== undefined ? audioCtx.currentTime : null) : null
-      const activeIndex = this.data.activeIndex
-      this.setData({ vibrato: event.detail.value })
-      if (activeIndex >= 0) this.playKey(activeIndex)
+      this.startMetronome()
+    },
+    startMetronome() {
+      if (!this.data.metronomeBpm || metronomeTimer !== null) return
+      const audio = this.getAudioContext()
+      if (!audio) return
+      metronomeGain = audio.createGain()
+      metronomeGain.gain.value = .65
+      metronomeGain.connect(masterGain || audio.destination)
+      const interval = 60 / this.data.metronomeBpm
+      let nextBeat = audio.currentTime + .02
+      const schedule = () => {
+        if (nextBeat < audio.currentTime) nextBeat = audio.currentTime + .02
+        while (nextBeat < audio.currentTime + .1) {
+          this.playKnobBeep(1200, nextBeat, metronomeGain)
+          nextBeat += interval
+        }
+      }
+      schedule()
+      metronomeTimer = setInterval(schedule, 25)
+    },
+    stopMetronome() {
+      if (metronomeTimer !== null) clearInterval(metronomeTimer)
+      metronomeTimer = null
+      if (metronomeGain) metronomeGain.disconnect()
+      metronomeGain = null
     },
     setInstrument(index: number) {
       if (this.data.isRecording || this.data.isPlaying || !INSTRUMENTS[index]) return
       const instrument = INSTRUMENTS[index]
       if (instrument.id !== this.data.instrument) {
+        this.flashScreenControl('tone')
         this.vibrate('medium')
         this.onKeyEnd()
         if (liveSynthVoice) liveSynthVoice.stop()
@@ -685,11 +702,11 @@ Component({
       if (this.data.instrument !== INSTRUMENTS[index].id) this.playKnobBeep(988)
       this.guideAction('tone', `音色已修改为${this.data.instrumentName}。`)
     },
-    playKnobBeep(frequency: number) {
+    playKnobBeep(frequency: number, when?: number, output?: any) {
       const audio = this.getAudioContext()
       if (!audio) return
       try {
-        const now = audio.currentTime
+        const now = when === undefined ? audio.currentTime : when
         const oscillator = audio.createOscillator()
         const gain = audio.createGain()
         oscillator.type = 'sine'
@@ -698,7 +715,7 @@ Component({
         gain.gain.linearRampToValueAtTime(.045, now + .004)
         gain.gain.exponentialRampToValueAtTime(.001, now + .075)
         oscillator.connect(gain)
-        gain.connect(masterGain || audio.destination)
+        gain.connect(output || masterGain || audio.destination)
         oscillator.onended = () => { oscillator.disconnect(); gain.disconnect() }
         oscillator.start(now)
         oscillator.stop(now + .08)
@@ -733,21 +750,13 @@ Component({
         const screen = results[0]
         if (screen && screen.width) this.setData({ laneWidth: Math.max(1, screen.width - 90) })
       })
-      this.createSelectorQuery().select('.disc-panel').boundingClientRect().exec(results => {
-        const area = results[0]
-        if (!area || !area.width || !area.height) return
-        const discSize = Math.max(0, Math.floor(Math.min(420, area.width - 40, area.height - 16)))
-        const measurePad = () => this.createSelectorQuery().select('.touch-disc').boundingClientRect().exec(rects => {
-          padRect = rects[0] || null
-        })
-        if (discSize !== this.data.discSize) {
-          padRect = null
-          this.setData({ discSize }, measurePad)
-        } else measurePad()
+      this.createSelectorQuery().select('.touch-disc').boundingClientRect().exec(results => {
+        padRect = results[0] || null
       })
     },
     handlePadTouches(event: WechatMiniprogram.TouchEvent, isStart: boolean) {
-      if (!padRect) return
+      const rect = padRect
+      if (!rect) return
       const touches = event.touches || []
       if (!touches.length) {
         touching = false
@@ -758,9 +767,9 @@ Component({
       if (isStart && this.data.instrument === 'drums' && candidateTouches.length > 1) {
         for (let i = 0; i < candidateTouches.length; i++) {
           const t = candidateTouches[i]
-          const x = (t.clientX - padRect.left - padRect.width / 2) / (padRect.width / 2)
-          const y = (t.clientY - padRect.top - padRect.height / 2) / (padRect.height / 2)
-          const k = padKeyAt(x, y)
+          const x = (t.clientX - rect.left - rect.width / 2) / (rect.width / 2)
+          const y = (t.clientY - rect.top - rect.height / 2) / (rect.height / 2)
+          const k = padKeyAt(x, y, rect.width, rect.height)
           if (k >= 0) this.playKey(k)
         }
         return
@@ -768,9 +777,9 @@ Component({
       let targetIndex = -1
       for (let i = candidateTouches.length - 1; i >= 0; i--) {
         const t = candidateTouches[i]
-        const x = (t.clientX - padRect.left - padRect.width / 2) / (padRect.width / 2)
-        const y = (t.clientY - padRect.top - padRect.height / 2) / (padRect.height / 2)
-        const k = padKeyAt(x, y)
+        const x = (t.clientX - rect.left - rect.width / 2) / (rect.width / 2)
+        const y = (t.clientY - rect.top - rect.height / 2) / (rect.height / 2)
+        const k = padKeyAt(x, y, rect.width, rect.height)
         if (k >= 0) {
           targetIndex = k
           break
@@ -779,31 +788,31 @@ Component({
       if (targetIndex < 0 && candidateTouches !== touches) {
         for (let i = touches.length - 1; i >= 0; i--) {
           const t = touches[i]
-          const x = (t.clientX - padRect.left - padRect.width / 2) / (padRect.width / 2)
-          const y = (t.clientY - padRect.top - padRect.height / 2) / (padRect.height / 2)
-          const k = padKeyAt(x, y)
+          const x = (t.clientX - rect.left - rect.width / 2) / (rect.width / 2)
+          const y = (t.clientY - rect.top - rect.height / 2) / (rect.height / 2)
+          const k = padKeyAt(x, y, rect.width, rect.height)
           if (k >= 0) {
             targetIndex = k
             break
           }
         }
       }
+      if (this.data.guideVisible && GUIDE_STEPS[this.data.guideStep].action === 'melody') {
+        if (targetIndex >= 0 && !this.data.guideDone && !this.data.guideDemoPlaying) this.playGuideDemo()
+        return
+      }
       if (targetIndex === this.data.activeIndex) return
       if (targetIndex >= 0) this.playKey(targetIndex)
       else if (!touches.some(t => {
-        const x = (t.clientX - padRect.left - padRect.width / 2) / (padRect.width / 2)
-        const y = (t.clientY - padRect.top - padRect.height / 2) / (padRect.height / 2)
-        return padKeyAt(x, y) >= 0
+        const x = (t.clientX - rect.left - rect.width / 2) / (rect.width / 2)
+        const y = (t.clientY - rect.top - rect.height / 2) / (rect.height / 2)
+        return padKeyAt(x, y, rect.width, rect.height) >= 0
       })) {
         this.releaseKey()
       }
     },
     onPadStart(event: WechatMiniprogram.TouchEvent) {
       if (this.data.libraryOpen || this.data.isScreenMoving || this.data.showSaveDialog) return
-      if (this.data.guideVisible && GUIDE_STEPS[this.data.guideStep].action === 'melody') {
-        if (!this.data.guideDone && !this.data.guideDemoPlaying) this.playGuideDemo()
-        return
-      }
       touching = true
       if (!padRect) {
         this.createSelectorQuery().select('.touch-disc').boundingClientRect().exec(results => {
@@ -843,15 +852,15 @@ Component({
       const key = this.data.keys[index]
       const voiceIndex = this.data.instrument === 'drums' ? DRUM_KEY_ORDER[index] : index
       const midiNote = this.data.instrument === 'drums' ? undefined : shiftedPitch(index, this.data.octaveIndex)
-      const hasVibrato = this.data.vibrato
+      const hasVibrato = this.data.instrument === 'synth'
       if (hasVibrato && vibratoStartedAt === null) vibratoStartedAt = audio.currentTime
       const vibratoAge = hasVibrato ? Math.max(0, Math.min(VIBRATO_READY, audio.currentTime - vibratoStartedAt!)) : 0
       try {
         if (reuseSynth) {
-          liveSynthVoice!.retune!(index, this.data.octaveIndex, this.data.vibrato, vibratoAge, midiNote)
+          liveSynthVoice!.retune!(index, this.data.octaveIndex, hasVibrato, vibratoAge, midiNote)
           liveVoice = liveSynthVoice
         } else {
-          liveVoice = this.createVoice(this.data.instrument, voiceIndex, this.data.octaveIndex, this.data.vibrato, audio.currentTime, undefined, vibratoAge, 0, 1, midiNote)
+          liveVoice = this.createVoice(this.data.instrument, voiceIndex, this.data.octaveIndex, hasVibrato, audio.currentTime, undefined, vibratoAge, 0, 1, midiNote)
           if (this.data.instrument === 'synth') liveSynthVoice = liveVoice
         }
       } catch (_) {
@@ -870,7 +879,7 @@ Component({
         if (!context) {
           context = (wx as any).createWebAudioContext()
           masterGain = context.createGain()
-          masterGain.gain.value = 2
+          masterGain.gain.value = 2.8
           masterGain.connect(context.destination)
         }
         if (context && context.resume) context.resume()
@@ -880,22 +889,7 @@ Component({
         return null
       }
     },
-    addVibrato(sources: any[], nodes: any[], when: number, age: number, phase: number) {
-      const lfo = context.createOscillator()
-      const depth = context.createGain()
-      lfo.type = 'sine'
-      lfo.frequency.value = VIBRATO_RATE
-      if (phase) lfo.setPeriodicWave(context.createPeriodicWave(new Float32Array([0, Math.sin(phase)]), new Float32Array([0, Math.cos(phase)])))
-      const strength = Math.max(0, Math.min(1, (age - VIBRATO_DELAY) / VIBRATO_FADE))
-      depth.gain.setValueAtTime(VIBRATO_DEPTH_CENTS * strength, when)
-      if (age < VIBRATO_DELAY) depth.gain.setValueAtTime(0, when + VIBRATO_DELAY - age)
-      if (age < VIBRATO_READY) depth.gain.linearRampToValueAtTime(VIBRATO_DEPTH_CENTS, when + VIBRATO_READY - age)
-      lfo.connect(depth)
-      sources.forEach(source => depth.connect(source.detune))
-      sources.push(lfo)
-      nodes.push(lfo, depth)
-    },
-    createDrumVoice(index: number, when: number, duration?: number, velocity = 1, vibrato = false, vibratoAge = 0, vibratoPhase = 0): Voice {
+    createDrumVoice(index: number, when: number, duration?: number, velocity = 1): Voice {
       const sound = DRUM_SOUNDS[index]
       const length = Math.max(.01, Math.min(sound.duration, duration === undefined ? sound.duration : duration))
       const gain = context.createGain()
@@ -948,7 +942,6 @@ Component({
       gain.gain.setValueAtTime(0, when)
       gain.gain.linearRampToValueAtTime(level, when + attack)
       gain.gain.exponentialRampToValueAtTime(levelAt(length), when + length)
-      if (vibrato) this.addVibrato(sources, nodes, when, vibratoAge, vibratoPhase)
       const voice = this.manageMelodicVoice(sources, nodes, gain, when, length, .012, levelAt)
       voice.oneShot = true
       return voice
@@ -993,7 +986,7 @@ Component({
       })
       return voice
     },
-    createPianoVoice(index: number, octave: number, when: number, duration?: number, velocity = 1, midiNote?: number, vibrato = false, vibratoAge = 0, vibratoPhase = 0): Voice {
+    createPianoVoice(index: number, octave: number, when: number, duration?: number, velocity = 1, midiNote?: number): Voice {
       const frequency = midiNote === undefined ? FREQUENCIES[index] * [0.5, 1, 2][octave] : 440 * Math.pow(2, (midiNote - 69) / 12)
       const source = context.createOscillator()
       const filter = context.createBiquadFilter()
@@ -1019,7 +1012,6 @@ Component({
       gain.gain.exponentialRampToValueAtTime(levelAt(length), when + length)
       const sources = [source]
       const nodes = [source, filter, gain]
-      if (vibrato) this.addVibrato(sources, nodes, when, vibratoAge, vibratoPhase)
       return this.manageMelodicVoice(sources, nodes, gain, when, length, .18, levelAt)
     },
     createSynthVoice(index: number, octave: number, when: number, duration?: number, vibrato = false, vibratoAge = 0, vibratoPhase = 0, velocity = 1, midiNote?: number): Voice {
@@ -1107,9 +1099,9 @@ Component({
       return voice
     },
     createVoice(instrument: InstrumentId, index: number, octave: number, vibrato: boolean, when: number, duration?: number, vibratoAge = 0, vibratoPhase = 0, velocity = 1, midiNote?: number): Voice {
-      if (instrument === 'drums') return this.createDrumVoice(index, when, duration, velocity, vibrato, vibratoAge, vibratoPhase)
-      if (instrument === 'piano') return this.createPianoVoice(index, octave, when, duration, velocity, midiNote, vibrato, vibratoAge, vibratoPhase)
-      return this.createSynthVoice(index, octave, when, duration, vibrato, vibratoAge, vibratoPhase, velocity, midiNote)
+      if (instrument === 'drums') return this.createDrumVoice(index, when, duration, velocity)
+      if (instrument === 'piano') return this.createPianoVoice(index, octave, when, duration, velocity, midiNote)
+      return this.createSynthVoice(index, octave, when, duration, true, vibrato ? vibratoAge : 0, vibratoPhase, velocity, midiNote)
     },
     finishNote() {
       if (!pendingNote) return
@@ -1239,20 +1231,27 @@ Component({
       const when = audio.currentTime + .05
       const span = Math.max(TIMELINE_MIN_DURATION, ...tracks.map(track => track.duration))
       const duration = Math.max(...tracks.map(track => track.duration + (track.instrument === 'piano' ? 180 : track.instrument === 'synth' ? 18 : 0)))
-      tracks.forEach(track => track.notes.forEach(note => {
-        playbackVoices.push(this.createVoice(
-          track.instrument!,
-          note.index,
-          note.octave,
-          note.vibrato,
-          when + note.start / 1000,
-          note.duration / 1000,
-          note.vibratoAge !== undefined ? note.vibratoAge : VIBRATO_READY,
-          note.vibratoPhase !== undefined ? note.vibratoPhase : 0,
-          note.velocity !== undefined ? note.velocity : 1,
-          note.midiNote
-        ))
-      }))
+      try {
+        tracks.forEach(track => track.notes.forEach(note => {
+          playbackVoices.push(this.createVoice(
+            track.instrument!,
+            note.index,
+            note.octave,
+            note.vibrato,
+            when + note.start / 1000,
+            note.duration / 1000,
+            note.vibratoAge !== undefined ? note.vibratoAge : VIBRATO_READY,
+            note.vibratoPhase !== undefined ? note.vibratoPhase : 0,
+            note.velocity !== undefined ? note.velocity : 1,
+            note.midiNote
+          ))
+        }))
+      } catch (_) {
+        this.stopPlayback()
+        this.stopVoices()
+        wx.showToast({ title: '播放失败，请重试', icon: 'none' })
+        return
+      }
       this.setData({ ...(fromLibrary ? { isScreenMoving: false, libraryLift: false } : {}), isPlaying: true, timelineSeconds: span / 1000, progress: 0, playbackProgress: this.data.tracks.map(track => track.notes.length ? 0 : -1), elapsedLabel: '0.0s' }, () => {
         if (fromLibrary) { padRect = null; this.measureKeys() }
       })

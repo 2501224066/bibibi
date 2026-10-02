@@ -58,10 +58,7 @@ for (let index = 0; index < 12; index++) {
   const key = page.data.keys[index], x = (key.labelLeft - 50) / 50, y = (key.labelTop - 50) / 50
   assert.equal(JSON.stringify(drumOscillators.map(node => [node.frequency.events, node.stops])), signature, 'release leaves drum tails playing')
   assert.equal(key.drumLabel, sound.name, 'icon and triggered sound match')
-  assert.equal(key.drumLabel.includes('镲'), index >= 2 && index <= 7, 'cymbals occupy the upper arc')
   assert.equal(sandbox.padKeyAt(x, y), index)
-  const angle = key.labelRotation * Math.PI / 180
-  assert.ok(Math.abs((Math.sin(angle) * -x - Math.cos(angle) * -y) / Math.hypot(x, y) - 1) < 1e-10)
 }
 assert.equal(drumSignatures.size, 12)
 page.setInstrument(1); page.setOctave(1)
@@ -83,7 +80,7 @@ assert.equal(page.data.savedMixes[0].tracks[0].notes[0].index, 2, 'old repeated 
 stored.soundLayoutVersion = 2
 page.loadLibrary()
 assert.equal(page.data.savedMixes[0].tracks[0].notes[0].index, 11, 'new sample indices survive reload')
-console.log('PASS: 72 live pitches, 36 contiguous MIDI notes, 12 distinct synthesized drums without audio files/buffers, radial icons, recording round-trip and legacy playback')
+console.log('PASS: 72 live pitches, 36 contiguous MIDI notes, 12 distinct synthesized drums without audio files/buffers, grid keys, recording round-trip and legacy playback')
 
 // Envelopes preserve dynamics, future scheduling and release/cleanup for all voices.
 for (const instrument of ['piano', 'drums', 'synth']) {
@@ -142,7 +139,7 @@ assert.equal(page.data.libraryOpen, false)
 
 // The bottom delete key clears the current session, or the selected saved item in library mode.
 const currentTracks = structuredClone(definition.data.tracks)
-currentTracks[0] = { ...currentTracks[0], instrument: 'piano', name: '钢琴', checked: true, duration: 100,
+currentTracks[0] = { ...currentTracks[0], instrument: 'piano', name: '钢琴', selected: true, duration: 100,
   notes: [{ index: 0, start: 0, duration: 100, octave: 1, vibrato: false }], bars: [] }
 page.setData({ tracks: currentTracks, hasTracks: true, libraryOpen: false })
 page.deleteCurrent()
