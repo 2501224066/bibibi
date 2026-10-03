@@ -114,9 +114,9 @@ function noteBars(notes: NoteEvent[], duration = TIMELINE_MIN_DURATION) {
     width: Math.min(100 - note.start / span * 100, note.duration / span * 100),
     top: (11 - note.index) / 12 * 100
   }))
-  if (rawBars.length <= 150) return rawBars
+  if (rawBars.length <= 40) return rawBars
 
-  // For long MIDI tracks (>150 notes), merge visually adjacent bars on the same row
+  // For long MIDI tracks, merge visually adjacent bars on the same row
   // to avoid rendering thousands of redundant DOM nodes on the timeline.
   const byRow: { [top: number]: typeof rawBars } = {}
   for (let i = 0; i < rawBars.length; i++) {
@@ -124,24 +124,30 @@ function noteBars(notes: NoteEvent[], duration = TIMELINE_MIN_DURATION) {
     if (!byRow[b.top]) byRow[b.top] = []
     byRow[b.top].push(b)
   }
-  const merged: typeof rawBars = []
-  const tops = Object.keys(byRow)
-  for (let r = 0; r < tops.length; r++) {
-    const rowBars = byRow[Number(tops[r])]
-    rowBars.sort((a, b) => a.left - b.left)
-    let cur: { id: number; left: number; width: number; top: number } | null = null
-    for (let i = 0; i < rowBars.length; i++) {
-      const b = rowBars[i]
-      if (!cur) {
-        cur = { id: 0, left: b.left, width: b.width, top: b.top }
-      } else if (b.left <= cur.left + cur.width + 0.35) {
-        cur.width = Math.max(cur.width, (b.left + b.width) - cur.left)
-      } else {
-        merged.push(cur)
-        cur = { id: 0, left: b.left, width: b.width, top: b.top }
+  let merged: typeof rawBars = []
+  let gapThresh = 0.45
+  for (let pass = 0; pass < 4; pass++) {
+    merged = []
+    const tops = Object.keys(byRow)
+    for (let r = 0; r < tops.length; r++) {
+      const rowBars = byRow[Number(tops[r])]
+      rowBars.sort((a, b) => a.left - b.left)
+      let cur: { id: number; left: number; width: number; top: number } | null = null
+      for (let i = 0; i < rowBars.length; i++) {
+        const b = rowBars[i]
+        if (!cur) {
+          cur = { id: 0, left: b.left, width: b.width, top: b.top }
+        } else if (b.left <= cur.left + cur.width + gapThresh) {
+          cur.width = Math.max(cur.width, (b.left + b.width) - cur.left)
+        } else {
+          merged.push(cur)
+          cur = { id: 0, left: b.left, width: b.width, top: b.top }
+        }
       }
+      if (cur) merged.push(cur)
     }
-    if (cur) merged.push(cur)
+    if (merged.length <= 50) break
+    gapThresh *= 1.8
   }
   merged.sort((a, b) => a.left - b.left)
   for (let i = 0; i < merged.length; i++) merged[i].id = i
@@ -1530,7 +1536,7 @@ Component({
           while (nIdx < track.notes.length) {
             const note = track.notes[nIdx]
             if (note.start / 1000 > horizonSec) break
-            playbackVoices.push(this.createVoice(
+            const voice = this.createVoice(
               track.instrument!,
               note.index,
               note.octave,
@@ -1541,7 +1547,9 @@ Component({
               note.vibratoPhase !== undefined ? note.vibratoPhase : 0,
               note.velocity !== undefined ? note.velocity : 1,
               note.midiNote
-            ))
+            );
+            (voice as any).stopAt = when + (note.start + note.duration) / 1000 + 0.3;
+            playbackVoices.push(voice)
             nIdx++
           }
           nextNoteIndices[tIdx] = nIdx
@@ -1573,6 +1581,10 @@ Component({
             scheduleNotes(audio.currentTime - when + LOOKAHEAD_SEC)
           } catch (_) {}
         }
+        const now = audio.currentTime
+        if (playbackVoices.length > 25) {
+          playbackVoices = playbackVoices.filter(v => !(v as any).stopAt || (v as any).stopAt >= now)
+        }
         const playbackProgress = this.data.tracks.map(track => {
           if (!tracks.some(playing => playing.id === track.id) || elapsed >= track.duration) return -1
           return elapsed / Math.max(TIMELINE_MIN_DURATION, track.duration) * 100
@@ -1585,9 +1597,19 @@ Component({
           const playing = tracks.find(item => item.id === track.id)
           return playing ? playingDrumIcon(playing, (audio.currentTime - when) * 1000) : ''
         })
-        this.setData({ playbackProgress, playbackNoteLabels, playbackDrumIcons, ...(!this.data.isRecording ? { progress: Math.min(100, elapsed / span * 100), elapsedLabel: `${(Math.min(elapsed, duration) / 1000).toFixed(1)}s`, timelineSeconds: span / 1000 } : {}) })
+        const nextElapsedLabel = `${(Math.min(elapsed, duration) / 1000).toFixed(1)}s`
+        const updates: Record<string, any> = {
+          playbackProgress,
+          playbackNoteLabels,
+          playbackDrumIcons,
+          ...(!this.data.isRecording ? { progress: Math.min(100, elapsed / span * 100) } : {})
+        }
+        if (!this.data.isRecording && this.data.elapsedLabel !== nextElapsedLabel) {
+          updates.elapsedLabel = nextElapsedLabel
+        }
+        this.setData(updates)
         if (elapsed >= duration + 40) this.stopPlayback()
-      }, 50)
+      }, 100)
     },
     stopPlayback() {
       if (playbackTimer !== null) clearInterval(playbackTimer)
