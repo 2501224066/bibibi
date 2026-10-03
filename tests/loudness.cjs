@@ -36,13 +36,17 @@ const code = stripTypeScriptTypes(fs.readFileSync('miniprogram/pages/index/index
         const weighted = (await meter.startRendering()).getChannelData(0)
         // Maximum 100 ms energy compares attacks without padding short drums with silence.
         const window = 4800
-        let energy = 0, maxEnergy = 0
+        let energy = 0, maxEnergy = 0, attackEnergy = 0, maxAttackEnergy = 0
+        const attackWindow = 960
         for (let i = 0; i < weighted.length; i++) {
           energy += weighted[i] ** 2
           if (i >= window) energy -= weighted[i - window] ** 2
           if (i >= window - 1) maxEnergy = Math.max(maxEnergy, energy)
+          attackEnergy += weighted[i] ** 2
+          if (i >= attackWindow) attackEnergy -= weighted[i - attackWindow] ** 2
+          if (i >= attackWindow - 1) maxAttackEnergy = Math.max(maxAttackEnergy, attackEnergy)
         }
-        return { instrument, index, midi, velocity, copies, db: 10 * Math.log10(maxEnergy / window), peak }
+        return { instrument, index, midi, velocity, copies, db: 10 * Math.log10(maxEnergy / window), attackDb: 10 * Math.log10(maxAttackEnergy / attackWindow), peak }
       }
       const rows = []
       for (const instrument of ['synth', 'piano']) for (let midi = 48; midi < 84; midi++) rows.push(await render(instrument, 0, midi))
@@ -58,6 +62,18 @@ const code = stripTypeScriptTypes(fs.readFileSync('miniprogram/pages/index/index
       console.log(instrument, 'weighted 100ms dBFS range:', Math.min(...notes.map(row => row.db)).toFixed(2), 'to', Math.max(...notes.map(row => row.db)).toFixed(2), 'peak:', Math.max(...notes.map(row => row.peak)).toFixed(3))
     }
     if (process.argv.includes('--report')) { console.log(JSON.stringify(rows)); return }
+    if (process.argv.includes('--drums')) {
+      const drums = rows.filter(row => row.instrument === 'drums' && row.velocity === 1 && row.copies === 1)
+      const attacks = drums.map(row => row.attackDb)
+      const balanced = drums.map(row => .65 * row.attackDb + .35 * row.db)
+      assert.ok(Math.max(...attacks) - Math.min(...attacks) < 2, 'drum attack loudness should stay within 2 dB')
+      assert.ok(Math.max(...balanced) - Math.min(...balanced) < .1, 'attack/body balance should match across drums')
+      assert.ok(drums.every(row => row.peak < .65), 'individual drum hits retain peak headroom')
+      const half = rows.find(row => row.instrument === 'drums' && row.velocity === .5)
+      assert.ok(Math.abs(drums[0].db - half.db - 6.0206) < .05, 'drum velocity retains its dynamics')
+      console.log('PASS: 12 drums balanced across attack/body energy, attack spread <2 dB, peak headroom and velocity dynamics')
+      return
+    }
     for (const row of rows) {
       assert.ok(Number.isFinite(row.db) && row.peak < .95, `clipping/non-finite output: ${JSON.stringify(row)}`)
       if (row.copies === 1 && row.velocity === 1) {

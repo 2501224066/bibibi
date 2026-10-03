@@ -27,7 +27,7 @@ module.exports = { pixels: pixels, width: width, scroll: scroll, active: active 
 <view class="page {{libraryOpen ? 'library-open' : ''}}">
   <view class="custom-navigation" style="padding-top: {{topInset}}px; padding-right: {{libraryButtonRight}}px;">
     <view class="navigation-content" style="height: {{libraryButtonSize}}px;">
-      <button class="logo-button" bindtap="triggerScreenGlitch" aria-label="哔哔，触发屏幕特效"><image class="navigation-logo" src="/assets/logo.png" mode="aspectFit" /></button>
+      <button hover-class="button-pressed" hover-start-time="0" hover-stay-time="50" class="logo-button" bindtap="playLogoDemo" aria-label="播放当前音色的示范旋律"><image class="navigation-logo" src="/assets/logo.png" mode="aspectFit" /></button>
       <button class="guide-help" style="top: {{libraryButtonTop}}px; right: {{libraryButtonRight}}px; height: {{libraryButtonSize}}px;" bindtap="startGuide" disabled="{{isRecording || isPlaying}}" aria-label="查看操作引导">帮助</button>
     </view>
   </view>
@@ -38,7 +38,7 @@ module.exports = { pixels: pixels, width: width, scroll: scroll, active: active 
           <view class="display-label {{isRecording ? 'is-recording' : ''}}"><text>{{isRecording ? 'REC' : isPlaying ? 'PLAY' : libraryOpen ? 'LIBRARY' : 'STOP'}}</text></view>
           <view class="timer"><text class="elapsed">{{!libraryOpen && !isRecording && !isPlaying ? '00:00' : clock.display(elapsedLabel)}}</text></view>
         </view>
-        <scroll-view wx:if="{{!libraryOpen || isPlaying}}" class="track-screen" scroll-y="{{true}}" scroll-into-view="{{scrollTrackIntoView}}" enhanced="{{true}}" show-scrollbar="{{false}}">
+        <scroll-view hidden="{{libraryOpen && !isPlaying}}" class="track-screen" scroll-y="{{true}}" scroll-into-view="{{scrollTrackIntoView}}" enhanced="{{true}}" show-scrollbar="{{false}}">
           <view wx:if="{{!hasTracks && !isRecording}}" class="track-instructions">
             <text class="track-instructions-title">录下你的第一段旋律</text>
             <text>1. 点击 音色 切换音色，音域 切换音域</text>
@@ -47,28 +47,28 @@ module.exports = { pixels: pixels, width: width, scroll: scroll, active: active 
             <text>点击保存，再次录音可添加音轨</text>
           </view>
           <view wx:for="{{tracks}}" wx:key="id" wx:if="{{item.notes.length || isRecording && recordingTrackId === item.id}}" id="track-{{item.id}}" class="track-row {{item.selected ? 'is-selected' : ''}} {{recordingTrackId === item.id ? 'current-track' : ''}}" data-id="{{item.id}}" bindtap="toggleTrackSelection" aria-role="button" aria-pressed="{{item.selected}}" aria-label="音轨{{index + 1}}{{item.selected ? '已选中' : '未选中'}}">
-            <scroll-view class="note-lane" scroll-x="{{true}}" scroll-left="{{timeline.scroll(isRecording && recordingTrackId === item.id ? progress : isPlaying && playbackProgress[item.id] >= 0 ? playbackProgress[item.id] : 0, item.duration, laneWidth)}}" show-scrollbar="{{false}}">
-              <view class="note-timeline" style="width: {{timeline.width(item.duration, laneWidth)}}px;">
+            <view class="note-lane">
+              <view class="note-timeline {{isRecording || isPlaying ? 'is-moving' : ''}}" style="transform: translate3d(-{{timeline.scroll(isRecording && recordingTrackId === item.id ? progress : isPlaying && playbackProgress[item.id] >= 0 ? playbackProgress[item.id] : 0, item.duration, laneWidth)}}px, 0, 0); width: {{timeline.width(item.duration, laneWidth)}}px;">
               <view wx:if="{{!item.bars.length}}" class="empty-track"></view>
               <view wx:for="{{item.bars}}" wx:for-item="bar" wx:key="id" class="note-bar {{isPlaying && timeline.active(playbackProgress[item.id], bar.left, bar.width) ? 'is-active' : ''}}" style="left: {{timeline.pixels(bar.left, item.duration)}}px; width: {{item.instrument === 'drums' ? 3 : timeline.pixels(bar.width, item.duration)}}px; top: {{bar.top}}%;"></view>
               <view wx:if="{{isRecording && recordingTrackId === item.id || isPlaying && playbackProgress[item.id] >= 0}}" class="playhead" style="left: {{timeline.pixels(isRecording && recordingTrackId === item.id ? progress : playbackProgress[item.id], item.duration)}}px;"></view>
               </view>
-            </scroll-view>
+            </view>
             <view class="track-meta {{!item.notes.length ? 'is-empty' : ''}}"><view class="track-note-heading"><view wx:if="{{item.instrument === 'drums'}}" class="track-current-drum"><image wx:if="{{isRecording && recordingTrackId === item.id ? activeIndex >= 0 : playbackDrumIcons[index]}}" class="track-drum-icon" src="{{isRecording && recordingTrackId === item.id ? activeDrumIcon : playbackDrumIcons[index]}}" mode="aspectFit" /><text wx:else>—</text></view><text wx:else class="track-current-note">{{isRecording && recordingTrackId === item.id ? activeNote || '—' : playbackNoteLabels[index] || '—'}}</text><image wx:if="{{item.instrument}}" class="track-instrument-icon" src="/assets/{{item.instrument}}-active.svg" mode="aspectFit" aria-label="{{item.name}}" /></view><text wx:if="{{item.notes.length}}" class="track-duration">{{clock.display(item.durationLabel)}}</text></view>
           </view>
         </scroll-view>
-        <scroll-view wx:else class="screen-library" scroll-into-view="{{guideVisible && guideSteps[guideStep].action === 'rainbow' ? 'mix-demo-rainbow-midi-v1' : ''}}" scroll-y="{{!isMixSwiping}}" enhanced="{{true}}" show-scrollbar="{{false}}">
+        <scroll-view hidden="{{!libraryOpen || isPlaying}}" class="screen-library" scroll-into-view="{{guideVisible && guideSteps[guideStep].action === 'rainbow' ? 'mix-demo-rainbow-midi-v1' : ''}}" scroll-y="{{!isMixSwiping}}" enhanced="{{true}}" show-scrollbar="{{false}}">
           <view wx:if="{{libraryError}}" class="library-empty">{{libraryError}}</view>
           <view wx:elif="{{!savedMixes.length}}" class="library-empty"><text>NO SAVED TRACKS</text><text class="library-empty-caption">录制后使用底部保存键</text></view>
           <view wx:for="{{savedMixes}}" wx:key="id" id="mix-{{item.id}}" class="screen-library-row {{guideVisible && guideSteps[guideStep].action === 'rainbow' && item.id === 'demo-rainbow-midi-v1' ? 'guide-rainbow-target' : ''}} {{selectedMixId === item.id ? 'is-selected' : ''}}" data-id="{{item.id}}" bindtap="selectSavedMix" aria-role="button" aria-label="{{item.name}}，{{item.durationLabel}}"><view class="library-led"></view><text class="saved-name">{{item.name}}</text><text class="saved-duration">{{item.durationLabel}}</text></view>
         </scroll-view>
         <view class="screen-footer">
           <text wx:if="{{libraryOpen && !isPlaying}}" class="library-count">{{savedMixes.length}} SAVED</text>
-          <view wx:else class="screen-control-icons"><image class="{{!controlFlashes.tone ? '' : controlFlashes.tone % 2 ? 'control-flash-a' : 'control-flash-b'}}" src="/assets/{{instrument}}-active.svg" mode="aspectFit"/><text class="screen-range {{!controlFlashes.range ? '' : controlFlashes.range % 2 ? 'control-flash-a' : 'control-flash-b'}}">{{octaveIndex === 0 ? 'L' : octaveIndex === 1 ? 'M' : 'H'}}</text><view class="screen-metronome {{metronomeBpm ? 'is-on' : 'is-off'}} {{!controlFlashes.metronome ? '' : controlFlashes.metronome % 2 ? 'control-flash-a' : 'control-flash-b'}}" aria-label="{{metronomeBpm ? '节拍' + metronomeBpm + ' BPM' : '节拍关闭'}}"><image src="/assets/metronome.svg" mode="aspectFit"/><text>{{metronomeBpm || 'OFF'}}</text></view></view>
-          <view class="screen-meter {{activeIndex >= 0 || guideDemoPlaying && guideExpectedKey >= 0 ? 'is-active' : ''}}"><view class="meter-bar meter-1"></view><view class="meter-bar meter-2"></view><view class="meter-bar meter-3"></view><view class="meter-bar meter-4"></view><view class="meter-bar meter-5"></view><view class="meter-bar meter-6"></view><view class="meter-bar meter-7"></view><view class="meter-lamp {{isRecording ? 'is-recording' : ''}}"></view></view>
+          <view wx:else class="screen-control-icons"><image data-control="tone" bindanimationend="finishScreenControlFlash" class="{{!controlFlashes.tone ? '' : controlFlashes.tone % 2 ? 'control-flash-a' : 'control-flash-b'}}" src="/assets/{{instrument}}-active.svg" mode="aspectFit"/><text data-control="range" bindanimationend="finishScreenControlFlash" class="screen-range {{!controlFlashes.range ? '' : controlFlashes.range % 2 ? 'control-flash-a' : 'control-flash-b'}}">{{octaveIndex === 0 ? 'L' : octaveIndex === 1 ? 'M' : 'H'}}</text><view data-control="metronome" bindanimationend="finishScreenControlFlash" class="screen-metronome {{metronomeBpm ? 'is-on' : 'is-off'}} {{!controlFlashes.metronome ? '' : controlFlashes.metronome % 2 ? 'control-flash-a' : 'control-flash-b'}}" aria-label="{{metronomeBpm ? '节拍' + metronomeBpm + ' BPM' : '节拍关闭'}}"><image src="/assets/metronome.svg" mode="aspectFit"/><text>{{metronomeBpm || 'OFF'}}</text></view></view>
+          <view class="screen-meter {{activeIndex >= 0 || logoDemoPlaying || guideDemoPlaying && guideExpectedKey >= 0 ? 'is-active' : ''}}"><view class="meter-bar meter-1"></view><view class="meter-bar meter-2"></view><view class="meter-bar meter-3"></view><view class="meter-bar meter-4"></view><view class="meter-bar meter-5"></view><view class="meter-bar meter-6"></view><view class="meter-bar meter-7"></view><view class="meter-lamp {{isRecording ? 'is-recording' : ''}}"></view></view>
         </view>
       </view>
-      <view class="bezel-strip" aria-hidden="true"><view class="screw"></view><view class="maker-mark {{isPlaying ? 'is-playing' : ''}}"><view></view><view></view><view></view><view></view><view></view></view><text>マスター</text><view class="screw"></view></view>
+      <view class="bezel-strip" aria-hidden="true"><view class="screw"></view><view class="maker-mark {{isPlaying || logoDemoPlaying ? 'is-playing' : ''}}"><view></view><view></view><view></view><view></view><view></view></view><text>マスター</text><view class="screw"></view></view>
     </view></view>
 
     <view class="speaker-grille" aria-hidden="true"><view wx:for="{{speakerRows}}" wx:for-item="row" wx:key="id" class="speaker-row"><view wx:for="{{row.dots}}" wx:for-item="dot" wx:key="*this" class="speaker-hole"></view></view></view>
@@ -77,9 +77,9 @@ module.exports = { pixels: pixels, width: width, scroll: scroll, active: active 
       <view class="disc-panel">
         <view class="disc-frame"><view class="touch-disc" catchtouchstart="onPadStart" catchtouchmove="onKeyMove" catchtouchend="onKeyEnd" catchtouchcancel="onKeyEnd">
           <block wx:for="{{padCells}}" wx:key="*this">
-            <view class="music-key {{(guideDemoPlaying ? guideExpectedKey : activeIndex) === item ? 'is-active' : ''}}" aria-role="button" aria-label="{{instrument === 'drums' ? keys[item].drumLabel : '音符' + keys[item].pitchLabel}}">
-              <image wx:if="{{instrument === 'drums'}}" class="music-key-icon" src="/assets/drum-key-{{keys[item].drumIconIndex}}{{(guideDemoPlaying ? guideExpectedKey : activeIndex) === item ? '-active' : ''}}.svg" mode="aspectFit" aria-hidden="true" />
-              <text wx:else class="music-key-label">{{keys[item].pitchLabel}}</text>
+            <view class="music-key {{logoDemoKeys[item] || (guideDemoPlaying ? guideExpectedKey : activeIndex) === item ? 'is-active' : ''}}" aria-role="button" aria-label="{{instrument === 'drums' ? keys[item].drumLabel : '音符' + keys[item].pitchLabel}}">
+              <image wx:if="{{instrument === 'drums'}}" class="music-key-icon" src="/assets/drum-key-{{keys[item].drumIconIndex}}{{logoDemoKeys[item] || (guideDemoPlaying ? guideExpectedKey : activeIndex) === item ? '-active' : ''}}.svg" mode="aspectFit" aria-hidden="true" />
+              <text wx:else class="music-key-label">{{logoDemoNoteLabels[item] || keys[item].pitchLabel}}</text>
             </view>
           </block>
         </view></view>
@@ -87,40 +87,40 @@ module.exports = { pixels: pixels, width: width, scroll: scroll, active: active 
 
       <view class="right-controls">
         <view class="knobs-row">
-          <button class="knob-control guide-tone" bindtap="cycleInstrument" disabled="{{isRecording || isPlaying}}" aria-label="音色{{instrumentName}}，点击切换"><view class="hardware-knob tone-knob" style="transform: rotate({{-45 + soundPosition * .9}}deg);"><view class="knob-slot"></view></view><text>音色</text></button>
-          <button class="knob-control guide-octave" bindtap="cycleOctave" disabled="{{isRecording || isPlaying}}" aria-label="音域{{octaveNames[octaveIndex]}}，点击切换"><view class="hardware-knob range-knob" style="transform: rotate({{-45 + octaveIndex * 45}}deg);"><view class="knob-slot"></view></view><text>音域</text></button>
-          <button class="knob-control guide-metronome" bindtap="cycleMetronome" aria-label="节拍{{metronomeBpm ? metronomeBpm + ' BPM' : '关闭'}}，点击切换"><view class="hardware-knob metronome-knob" style="transform: rotate({{metronomeIndex * 30}}deg);"><view class="knob-slot"></view></view><text>节拍</text></button>
+          <button hover-class="button-pressed" hover-start-time="0" hover-stay-time="50" class="knob-control guide-tone" bindtap="cycleInstrument" disabled="{{isRecording || isPlaying}}" aria-label="音色{{instrumentName}}，点击切换"><view class="hardware-knob tone-knob" style="transform: rotate({{-45 + soundPosition * .9}}deg);"><view class="knob-slot"></view></view><text>音色</text></button>
+          <button hover-class="button-pressed" hover-start-time="0" hover-stay-time="50" class="knob-control guide-octave" bindtap="cycleOctave" disabled="{{isRecording || isPlaying}}" aria-label="音域{{octaveNames[octaveIndex]}}，点击切换"><view class="hardware-knob range-knob" style="transform: rotate({{-45 + octaveIndex * 45}}deg);"><view class="knob-slot"></view></view><text>音域</text></button>
+          <button hover-class="button-pressed" hover-start-time="0" hover-stay-time="50" class="knob-control guide-metronome" bindtap="cycleMetronome" aria-label="节拍{{metronomeBpm ? metronomeBpm + ' BPM' : '关闭'}}，点击切换"><view class="hardware-knob metronome-knob" style="transform: rotate({{metronomeIndex * 30}}deg);"><view class="knob-slot"></view></view><text>节拍</text></button>
         </view>
         <view class="transport-area">
           <view class="transport-controls">
-          <button hover-class="button-pressed" class="library-button {{libraryOpen ? 'is-on' : ''}} {{libraryGlow ? 'is-glowing' : ''}} {{libraryLift ? 'is-lifting' : ''}}" bindtap="toggleLibrary" bindanimationend="finishLibraryAnimation" disabled="{{isRecording}}" aria-label="{{libraryOpen ? '关闭音库' : '打开音库'}}"><image class="transport-icon" src="/assets/library-note.svg" mode="aspectFit"/></button>
-            <button hover-class="button-pressed" class="record-button {{isRecording ? 'is-recording' : ''}}" bindtap="toggleRecording" disabled="{{libraryOpen}}" aria-label="{{isRecording ? '结束录制' : '开始录制'}}"><view class="record-dot"></view></button>
-          <button hover-class="button-pressed" class="mix-button {{isPlaying ? 'is-playing' : ''}}" bindtap="togglePlayback" disabled="{{isRecording || !isPlaying && (libraryOpen ? !selectedMixId : !hasTracks)}}" aria-label="{{isPlaying ? '停止播放' : '播放'}}"><image class="transport-icon" src="/assets/control-{{isPlaying ? 'stop' : 'play'}}.svg" mode="aspectFit"/></button>
+            <button hover-class="button-pressed" hover-stay-time="50" hover-start-time="0" class="library-button {{libraryOpen ? 'is-on' : ''}} {{libraryGlow ? 'is-glowing' : ''}} {{libraryLift ? 'is-lifting' : ''}}" bindtap="toggleLibrary" bindanimationend="finishLibraryAnimation" disabled="{{isRecording}}" aria-label="{{libraryOpen ? '关闭音库' : '打开音库'}}"><image class="transport-icon" src="/assets/library-note.svg" mode="aspectFit"/></button>
+            <button hover-class="button-pressed" hover-stay-time="50" hover-start-time="0" class="record-button {{isRecording ? 'is-recording' : ''}}" bindtap="toggleRecording" disabled="{{libraryOpen}}" aria-label="{{isRecording ? '结束录制' : '开始录制'}}"><view class="record-dot"></view></button>
+            <button hover-class="button-pressed" hover-stay-time="50" hover-start-time="0" class="mix-button {{isPlaying ? 'is-playing' : ''}}" bindtap="togglePlayback" disabled="{{isRecording || !isPlaying && (libraryOpen ? !selectedMixId : !hasTracks)}}" aria-label="{{isPlaying ? '停止播放' : '播放'}}"><image class="transport-icon" src="/assets/control-{{isPlaying ? 'stop' : 'play'}}.svg" mode="aspectFit"/></button>
           </view>
           <view class="transport-labels"><text>音库</text><text>录制</text><text>播放</text></view>
         </view>
       </view>
 
       <view class="bottom-actions">
-        <button class="round-action bottom-save" bindtap="openSaveDialog" disabled="{{isRecording || !hasTracks}}" aria-label="保存当前音轨"><view class="action-cap"></view><text>保存</text></button>
-        <button class="round-action bottom-delete" bindtap="deleteCurrent" disabled="{{isRecording || libraryOpen && !selectedMixId || !libraryOpen && !hasSelectedTracks}}" aria-label="删除选中内容"><view class="action-cap"></view><text>删除</text></button>
+        <button hover-class="button-pressed" hover-start-time="0" hover-stay-time="50" class="round-action bottom-save" bindtap="openSaveDialog" disabled="{{isRecording || !hasTracks}}" aria-label="保存当前音轨"><view class="action-cap"></view><text>保存</text></button>
+        <button hover-class="button-pressed" hover-start-time="0" hover-stay-time="50" class="round-action bottom-delete" bindtap="deleteCurrent" disabled="{{isRecording || libraryOpen && !selectedMixId || !libraryOpen && !hasSelectedTracks}}" aria-label="删除选中内容"><view class="action-cap"></view><text>删除</text></button>
       </view>
     </view>
   </view>
 
   <block wx:if="{{guideVisible}}">
-    <view wx:for="{{guideMasks}}" wx:key="index" class="guide-blocker" catchtouchmove="stopDialogEvent" style="left: {{item.left}}px; top: {{item.top}}px; width: {{item.width}}px; height: {{item.height}}px;"></view>
+    <view wx:for="{{guideMasks}}" wx:key="index" class="guide-blocker {{guideFading ? 'is-fading' : ''}}" catchtouchmove="stopDialogEvent" style="left: {{item.left}}px; top: {{item.top}}px; width: {{item.width}}px; height: {{item.height}}px;"></view>
     <block wx:if="{{guideSteps[guideStep].action !== 'melody'}}">
-      <view class="guide-window-edge" style="left: {{guideRect.left - 2}}px; top: {{guideRect.top - 2}}px; width: {{guideRect.width + 4}}px; height: 2px;"></view>
-      <view class="guide-window-edge" style="left: {{guideRect.left - 2}}px; top: {{guideRect.top + guideRect.height}}px; width: {{guideRect.width + 4}}px; height: 2px;"></view>
-      <view class="guide-window-edge" style="left: {{guideRect.left - 2}}px; top: {{guideRect.top}}px; width: 2px; height: {{guideRect.height}}px;"></view>
-      <view class="guide-window-edge" style="left: {{guideRect.left + guideRect.width}}px; top: {{guideRect.top}}px; width: 2px; height: {{guideRect.height}}px;"></view>
+      <view class="guide-window-edge {{guideFading ? 'is-fading' : ''}}" style="left: {{guideRect.left - 2}}px; top: {{guideRect.top - 2}}px; width: {{guideRect.width + 4}}px; height: 2px;"></view>
+      <view class="guide-window-edge {{guideFading ? 'is-fading' : ''}}" style="left: {{guideRect.left - 2}}px; top: {{guideRect.top + guideRect.height}}px; width: {{guideRect.width + 4}}px; height: 2px;"></view>
+      <view class="guide-window-edge {{guideFading ? 'is-fading' : ''}}" style="left: {{guideRect.left - 2}}px; top: {{guideRect.top}}px; width: 2px; height: {{guideRect.height}}px;"></view>
+      <view class="guide-window-edge {{guideFading ? 'is-fading' : ''}}" style="left: {{guideRect.left + guideRect.width}}px; top: {{guideRect.top}}px; width: 2px; height: {{guideRect.height}}px;"></view>
     </block>
-    <view class="guide-card" catchtouchmove="stopDialogEvent" style="top: {{guideCardBottom >= 0 ? 'auto' : guideCardTop + 'px'}}; bottom: {{guideCardBottom >= 0 ? guideCardBottom + 'px' : 'auto'}}; max-height: {{guideCardHeight}}px;" aria-role="dialog" aria-label="操作引导">
+    <view class="guide-card {{guideFading ? 'is-fading' : ''}}" catchtouchmove="stopDialogEvent" style="top: {{guideCardBottom >= 0 ? 'auto' : guideCardTop + 'px'}}; bottom: {{guideCardBottom >= 0 ? guideCardBottom + 'px' : 'auto'}}; max-height: {{guideCardHeight}}px;" aria-role="dialog" aria-label="操作引导">
       <view class="guide-heading"><text>{{guideStep + 1}} / {{guideSteps.length}}</text><button class="guide-skip" bindtap="finishGuide">跳过</button></view>
       <view class="guide-title">{{guideSteps[guideStep].title}}</view>
       <view class="guide-description">{{guideFeedback || guideSteps[guideStep].text}}</view>
-      <view class="guide-actions"><button wx:if="{{guideStep > 0 && !isPlaying}}" class="guide-previous" bindtap="previousGuide">上一步</button><button class="guide-next" disabled="{{guideDemoPlaying || !guideDone && guideSteps[guideStep].action !== 'melody'}}" bindtap="nextGuide">{{guideDemoPlaying ? '示范中…' : guideSteps[guideStep].action === 'melody' && !guideDone ? '示范' : guideStep === guideSteps.length - 1 ? '完成' : '下一步'}}</button></view>
+      <view class="guide-actions"><button wx:if="{{guideStep > 0 && !isPlaying}}" class="guide-previous" bindtap="previousGuide">上一步</button><button wx:if="{{guideStep < guideSteps.length - 1}}" class="guide-next" disabled="{{guideDemoPlaying || !guideDone && guideSteps[guideStep].action !== 'melody'}}" bindtap="nextGuide">{{guideDemoPlaying ? '示范中…' : guideSteps[guideStep].action === 'melody' && !guideDone ? '示范' : '下一步'}}</button></view>
     </view>
   </block>
 

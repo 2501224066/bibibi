@@ -116,7 +116,7 @@ for (track, channel), sequence in sorted(notes.items()):
 assert len(tracks) <= 5
 while len(tracks) < 5:
     tracks.append(dict(instrument=None, duration=0, notes=[]))
-fixture = dict(id='demo-rainbow-midi-v1', name='彩虹 · 完整版', duration=duration, tracks=tracks)
+fixture = dict(id='demo-rainbow-midi-v1', name='彩虹-周杰伦', duration=duration, tracks=tracks)
 output = Path(__file__).resolve().parents[1] / 'miniprogram/assets/demo-rainbow.json'
 output.write_text(json.dumps(fixture, ensure_ascii=False, separators=(',', ':')), encoding='utf8')
 print(json.dumps(dict(source=source.name, sourceSeconds=round(milliseconds(max(event[0] for event in events)) / 1000, 2),

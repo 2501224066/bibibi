@@ -4,9 +4,20 @@ const fs = require('node:fs')
 const vm = require('node:vm')
 const { stripTypeScriptTypes } = require('node:module')
 let definition, seen = false, demoTick, recordTick
+const timeouts = new Map()
+let timeoutId = 0
+const runTimeout = delay => {
+  const entry = [...timeouts].find(([, timer]) => timer.delay === delay)
+  assert.ok(entry, `expected a ${delay}ms timer`)
+  timeouts.delete(entry[0])
+  entry[1].callback()
+}
 const audio = { currentTime: 0 }
 const demoNotes = []
-const sandbox = { setInterval(callback, interval) { if (interval === 40) demoTick = callback; else recordTick = callback; return interval }, clearInterval() {}, Component(value) { definition = value }, wx: {
+const sandbox = {
+  setTimeout(callback, delay) { const id = ++timeoutId; timeouts.set(id, { callback, delay }); return id },
+  clearTimeout(id) { timeouts.delete(id) },
+  setInterval(callback, interval) { if (interval === 40) demoTick = callback; else recordTick = callback; return interval }, clearInterval() {}, Component(value) { definition = value }, wx: {
   getStorageSync: () => seen,
   getFileSystemManager: () => ({ readFileSync: () => fs.readFileSync('miniprogram/assets/demo-rainbow.json', 'utf8') }),
   setStorageSync(key, value) { assert.equal(key, 'bibibi.guide.v1'); seen = value },
@@ -61,7 +72,7 @@ page.nextGuide()
 assert.equal(demoNotes.length, 14, 'cannot duplicate a running demonstration')
 audio.currentTime = .9
 demoTick()
-assert.equal(page.data.guideExpectedKey, 4)
+assert.equal(page.data.guideExpectedKey, 2)
 audio.currentTime = 1.2
 demoTick()
 assert.equal(page.data.guideExpectedKey, -1, 'key releases in the gap between notes')
@@ -104,14 +115,32 @@ page.togglePlayback()
 assert.equal(page.data.isPlaying, true)
 assert.equal(page.data.guideDone, true, 'actual playback completes the final step')
 page.nextGuide()
+assert.equal(page.data.guideVisible, true, 'final step stays visible without requiring a finish button')
+assert.equal(page.data.guideFading, false)
+runTimeout(1000)
+assert.equal(page.data.guideVisible, true, 'guide remains mounted during fade')
+assert.equal(page.data.guideFading, true)
+runTimeout(350)
 assert.equal(page.data.guideVisible, false)
+assert.equal(page.data.isPlaying, true, 'automatic dismissal keeps the music playing')
 assert.equal(seen, true)
+assert.equal(timeouts.size, 0)
 page.stopPlayback()
 definition.lifetimes.ready.call(page)
 assert.equal(page.data.guideVisible, false, 'completed guide is not shown automatically')
 page.startGuide()
 assert.equal(page.data.guideVisible, true, 'help reopens guide')
+page.enterGuideStep(page.data.guideSteps.length - 1)
+page.guideAction('play', '正在播放。')
+assert.equal(timeouts.size, 1)
+page.enterGuideStep(0)
+assert.equal(timeouts.size, 0, 'changing steps cancels automatic dismissal')
+page.enterGuideStep(page.data.guideSteps.length - 1)
+page.guideAction('play', '正在播放。')
+runTimeout(1000)
 page.finishGuide()
+assert.equal(timeouts.size, 0, 'manual dismissal cancels the pending fade timer')
+assert.equal(page.data.guideFading, false)
 page.data.isRecording = true
 page.startGuide()
 assert.equal(page.data.guideVisible, false, 'recording is not interrupted')
@@ -119,6 +148,7 @@ console.log('PASS: first visit, positioning, previous/next, completion memory, m
 
 const markup = fs.readFileSync('miniprogram/pages/index/index.wxml', 'utf8')
 assert.ok(markup.includes('<block wx:if="{{guideVisible}}">'), 'guide must not have a full-screen hit target')
+assert.ok(markup.includes('wx:if="{{guideStep < guideSteps.length - 1}}" class="guide-next"'), 'final step has no finish button')
 assert.ok(!markup.includes('class="guide-focus"'), 'no transparent view may cover the interactive hole')
 for (const step of definition.data.guideSteps) {
   assert.ok(!step.selector.includes(':nth-child'), 'selector query uses direct classes')

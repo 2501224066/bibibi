@@ -33,7 +33,9 @@ tick()
 assert.equal(page.data.libraryOpen, true)
 assert.equal(page.data.isPlaying, false, 'natural end returns to library list')
 page.togglePlayback()
+for (const control of ['tone', 'range', 'metronome']) page.flashScreenControl(control)
 page.closeLibrary()
+assert.equal(JSON.stringify(page.data.controlFlashes), JSON.stringify({ tone: 0, range: 0, metronome: 0 }), 'closing the library cannot replay stale knob glows')
 assert.equal(page.data.isPlaying, false)
 assert.equal(page.data.libraryOpen, false)
 assert.equal(page.data.hasSelectedTracks, true)
@@ -58,3 +60,15 @@ assert.equal(page.data.libraryGlow, true, 'successful saving visibly highlights 
 page.finishLibraryAnimation()
 assert.equal(page.data.libraryGlow, false)
 console.log('PASS: playback failure cleanup and save feedback')
+
+for (const control of ['tone', 'range', 'metronome']) {
+  page.flashScreenControl(control)
+  assert.equal(page.data.controlFlashes[control], 1, 'knob change still starts a glow')
+  page.finishScreenControlFlash({ currentTarget: { dataset: { control } } })
+  assert.equal(page.data.controlFlashes[control], 0, 'completed glow removes its animation class')
+}
+const markup = fs.readFileSync('miniprogram/pages/index/index.wxml', 'utf8')
+for (const control of ['tone', 'range', 'metronome']) {
+  assert.ok(markup.includes(`data-control="${control}" bindanimationend="finishScreenControlFlash"`))
+}
+console.log('PASS: control glows clear on animation completion and library close')

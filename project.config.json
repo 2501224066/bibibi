@@ -14,11 +14,11 @@
     },
     "coverView": false,
     "postcss": false,
-    "minified": false,
+    "minified": true,
     "enhance": false,
     "showShadowRootInWxmlPanel": false,
     "packNpmRelationList": [],
-    "ignoreUploadUnusedFiles": false,
+    "ignoreUploadUnusedFiles": true,
     "compileHotReLoad": false,
     "skylineRenderEnable": true,
     "es6": false,
@@ -66,6 +66,34 @@
     "include": [
       {
         "value": "assets/demo-rainbow.json",
+        "type": "file"
+      },
+      {
+        "value": "assets/demo-nocturne.json",
+        "type": "file"
+      },
+      {
+        "value": "assets/demo-lawrence.json",
+        "type": "file"
+      },
+      {
+        "value": "assets/demo-zebra.json",
+        "type": "file"
+      },
+      {
+        "value": "assets/demo-boundless.json",
+        "type": "file"
+      },
+      {
+        "value": "assets/demo-summer.json",
+        "type": "file"
+      },
+      {
+        "value": "assets/demo-doraemon.json",
+        "type": "file"
+      },
+      {
+        "value": "assets/demo-moonboat.json",
         "type": "file"
       }
     ]

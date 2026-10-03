@@ -3,7 +3,7 @@ type NoteEvent = { index: number; start: number; duration: number; octave: numbe
 type Track = { id: number; instrument: InstrumentId | null; name: string; octaveLabel: string; selected: boolean; duration: number; durationLabel: string; notes: NoteEvent[]; bars: { id: number; left: number; width: number; top: number }[] }
 type SavedMix = { id: string; name: string; duration: number; durationLabel: string; tracks: Track[] }
 const GUIDE_KEY = 'bibibi.guide.v1'
-const GUIDE_MELODY = [[0, 1], [2, 1], [4, 1], [0, 1], [0, 1], [2, 1], [4, 1], [0, 1], [4, 1], [5, 1], [7, 2], [4, 1], [5, 1], [7, 2]]
+const GUIDE_MELODY = [[0, 1], [1, 1], [2, 1], [0, 1], [0, 1], [1, 1], [2, 1], [0, 1], [2, 1], [3, 1], [4, 2], [2, 1], [3, 1], [4, 2]]
 const GUIDE_STEPS = [
   { selector: '.tone-knob', action: 'tone', title: '音色旋钮：切换乐器', text: '点击 音色 切换一次音色，观察屏幕左下方的图标变化。' },
   { selector: '.range-knob', action: 'octave', title: '音域旋钮：切换高低音', text: '点击 音域，观察屏幕上的 L / M / H 音域标记变化。' },
@@ -52,34 +52,45 @@ const INSTRUMENTS: { id: InstrumentId; name: string }[] = [
 // Legacy pitches preserve recordings made before the chromatic layout.
 const FREQUENCIES = [349.23, 392, 440, 493.88, 523.25, 587.33, 261.63, 293.66, 329.63, 698.46, 783.99, 880]
 const METRONOME_BPMS = [0, 60, 90, 120]
-const PAD_CELLS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+const PAD_CELLS = [6, 7, 8, 9, 10, 11, 0, 1, 2, 3, 4, 5]
 // Raised about 5 dB after device listening feedback; velocity remains linear.
 const INSTRUMENT_LEVELS = { synth: .063, piano: .074 }
+// Balance 20ms attacks and 100ms body energy; equal body RMS alone makes short hits too loud.
 const DRUM_SOUNDS = [
-  { name: '军鼓', kind: 'snare', frequency: 185, duration: .32, level: 0.0755 },
-  { name: '高通鼓', kind: 'tom', frequency: 220, duration: .55, level: 0.0762 },
-  { name: '闭合踩镲', kind: 'metal', frequency: 410, duration: .12, level: 0.1319 },
-  { name: '开放踩镲', kind: 'metal', frequency: 410, duration: .65, level: 0.0624 },
-  { name: '吊镲', kind: 'metal', frequency: 295, duration: 1.8, level: 0.0493 },
-  { name: '叮叮镲', kind: 'metal', frequency: 630, duration: 1.4, level: 0.0591 },
-  { name: '中通鼓', kind: 'tom', frequency: 165, duration: .65, level: 0.0721 },
-  { name: '落地通鼓', kind: 'tom', frequency: 110, duration: .8, level: 0.0663 },
-  { name: '底鼓', kind: 'kick', frequency: 55, duration: .45, level: 0.0782 },
-  { name: '军鼓Ⅱ', kind: 'snare', frequency: 240, duration: .22, level: 0.0888 },
-  { name: '吊镲Ⅱ', kind: 'metal', frequency: 345, duration: 2.1, level: 0.0471 },
-  { name: '水镲', kind: 'metal', frequency: 520, duration: .8, level: 0.0613 },
+  { name: '军鼓', kind: 'snare', frequency: 185, duration: .32, level: 0.068 },
+  { name: '高通鼓', kind: 'tom', frequency: 220, duration: .55, level: 0.0744 },
+  { name: '闭合踩镲', kind: 'metal', frequency: 410, duration: .12, level: 0.1013 },
+  { name: '开放踩镲', kind: 'metal', frequency: 410, duration: .65, level: 0.0637 },
+  { name: '吊镲', kind: 'metal', frequency: 295, duration: 1.8, level: 0.0556 },
+  { name: '叮叮镲', kind: 'metal', frequency: 630, duration: 1.4, level: 0.0655 },
+  { name: '中通鼓', kind: 'tom', frequency: 165, duration: .65, level: 0.0725 },
+  { name: '落地通鼓', kind: 'tom', frequency: 110, duration: .8, level: 0.0691 },
+  { name: '底鼓', kind: 'kick', frequency: 55, duration: .45, level: 0.0752 },
+  { name: '军鼓Ⅱ', kind: 'snare', frequency: 240, duration: .22, level: 0.074 },
+  { name: '吊镲Ⅱ', kind: 'metal', frequency: 345, duration: 2.1, level: 0.0541 },
+  { name: '水镲', kind: 'metal', frequency: 520, duration: .8, level: 0.0643 },
 ]
-const NOTE_STEPS = [5, 7, 9, 11, 12, 14, 0, 2, 4, 17, 19, 21]
+const DIATONIC_STEPS = [0, 2, 4, 5, 7, 9, 11, 12, 14, 16, 17, 19]
+const NOTE_STEPS = DIATONIC_STEPS
 // Keep drum sound indices stable as the physical layout changes.
 // Recorded drum indices continue to identify sounds, independent of layout.
-const DRUM_KEY_ORDER = [2, 3, 4, 5, 10, 11, 0, 1, 6, 7, 9, 8]
+const DRUM_KEY_ORDER = [0, 1, 6, 7, 9, 8, 2, 3, 4, 5, 10, 11]
+// Each entry is [pitch/key, start beat, length in beats]; melodic pitches can cross octaves.
+const LOGO_DEMOS: Record<InstrumentId, number[][]> = {
+  piano: [[4, 0, .95], [2, 1, .45], [4, 1.5, .45], [7, 2, 1.95], [5, 4, .95], [7, 5, .95], [4, 6, 1.95], [4, 8, .95], [0, 9, .45], [1, 9.5, .45], [2, 10, .95], [1, 11, .45], [0, 11.5, .45], [1, 12, 3.95]],
+  synth: [[0, 0, .4], [4, .5, .4], [6, 1, .4], [4, 1.5, .4], [0, 2, .4], [2, 2.5, .4], [4, 3, .8], [6, 4, .4], [4, 4.5, .4], [2, 5, .4], [1, 5.5, .4], [2, 6, .8], [0, 7, 1.8]],
+  drums: [[5, 0, .2], [6, 0, .2], [6, .5, .2], [0, 1, .2], [6, 1, .2], [6, 1.5, .2], [5, 2, .2], [6, 2, .2], [5, 2.5, .2], [6, 2.5, .2], [0, 3, .2], [6, 3, .2], [7, 3.5, .2], [5, 4, .2], [8, 4, .2], [1, 5, .2], [2, 5.5, .2], [5, 6, .2]],
+}
+const DIATONIC_NAMES = ['C', 'D', 'E', 'F', 'G', 'A', 'B', 'C', 'D', 'E', 'F', 'G']
+const DIATONIC_OCTAVE_OFFSETS = [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1]
 const NOTE_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
 function shiftedKey(index: number, octave = 1) {
-  const note = NOTE_NAMES[index]
-  return { label: note, note, pitchLabel: `${note}${octave + 3}` }
+  const note = DIATONIC_NAMES[index]
+  const oct = octave + 3 + DIATONIC_OCTAVE_OFFSETS[index]
+  return { label: note, note, pitchLabel: `${note}${oct}` }
 }
 function shiftedPitch(index: number, octave: number): number {
-  return 48 + octave * 12 + index
+  return 48 + octave * 12 + DIATONIC_STEPS[index]
 }
 const activeVoices = new Set<Voice>()
 function padKeyAt(x: number, y: number, width = 0, height = 0): number {
@@ -97,25 +108,90 @@ function padKeyAt(x: number, y: number, width = 0, height = 0): number {
 
 function noteBars(notes: NoteEvent[], duration = TIMELINE_MIN_DURATION) {
   const span = Math.max(TIMELINE_MIN_DURATION, duration)
-  return notes.map((note, id) => ({ id, left: note.start / span * 100, width: Math.min(100 - note.start / span * 100, note.duration / span * 100), top: (11 - note.index) / 12 * 100 }))
+  const rawBars = notes.map((note, id) => ({
+    id,
+    left: note.start / span * 100,
+    width: Math.min(100 - note.start / span * 100, note.duration / span * 100),
+    top: (11 - note.index) / 12 * 100
+  }))
+  if (rawBars.length <= 150) return rawBars
+
+  // For long MIDI tracks (>150 notes), merge visually adjacent bars on the same row
+  // to avoid rendering thousands of redundant DOM nodes on the timeline.
+  const byRow: { [top: number]: typeof rawBars } = {}
+  for (let i = 0; i < rawBars.length; i++) {
+    const b = rawBars[i]
+    if (!byRow[b.top]) byRow[b.top] = []
+    byRow[b.top].push(b)
+  }
+  const merged: typeof rawBars = []
+  const tops = Object.keys(byRow)
+  for (let r = 0; r < tops.length; r++) {
+    const rowBars = byRow[Number(tops[r])]
+    rowBars.sort((a, b) => a.left - b.left)
+    let cur: { id: number; left: number; width: number; top: number } | null = null
+    for (let i = 0; i < rowBars.length; i++) {
+      const b = rowBars[i]
+      if (!cur) {
+        cur = { id: 0, left: b.left, width: b.width, top: b.top }
+      } else if (b.left <= cur.left + cur.width + 0.35) {
+        cur.width = Math.max(cur.width, (b.left + b.width) - cur.left)
+      } else {
+        merged.push(cur)
+        cur = { id: 0, left: b.left, width: b.width, top: b.top }
+      }
+    }
+    if (cur) merged.push(cur)
+  }
+  merged.sort((a, b) => a.left - b.left)
+  for (let i = 0; i < merged.length; i++) merged[i].id = i
+  return merged
+}
+
+function findNoteStartIndex(notes: NoteEvent[], elapsed: number): number {
+  let low = 0
+  let high = notes.length - 1
+  const target = elapsed - 6000
+  let result = 0
+  while (low <= high) {
+    const mid = (low + high) >> 1
+    if (notes[mid].start >= target) {
+      result = mid
+      high = mid - 1
+    } else {
+      low = mid + 1
+    }
+  }
+  return result
 }
 
 function playingDrumIcon(track: Track, elapsed: number): string {
   if (track.instrument !== 'drums') return ''
   let current: NoteEvent | undefined
-  for (const note of track.notes) {
+  const startIdx = track.notes.length > 50 ? findNoteStartIndex(track.notes, elapsed) : 0
+  for (let i = startIdx; i < track.notes.length; i++) {
+    const note = track.notes[i]
+    if (note.start > elapsed + 2000) break
     if (note.start <= elapsed && elapsed < note.start + note.duration && (!current || note.start >= current.start)) current = note
   }
   return current ? `/assets/drum-key-${current.index}.svg` : ''
 }
 
 function playingNoteLabel(track: Track, elapsed: number): string {
-  const labels = track.notes.filter(note => note.start <= elapsed && elapsed < note.start + note.duration).map(note => {
-    if (track.instrument === 'drums') return DRUM_SOUNDS[note.index].name
-    const pitch = note.midiNote !== undefined ? note.midiNote : 48 + note.octave * 12 + NOTE_STEPS[note.index]
-    return `${NOTE_NAMES[pitch % 12]}${Math.floor(pitch / 12) - 1}`
-  })
-  return Array.from(new Set(labels)).join(' · ') || '—'
+  const labels: string[] = []
+  const startIdx = track.notes.length > 50 ? findNoteStartIndex(track.notes, elapsed) : 0
+  for (let i = startIdx; i < track.notes.length; i++) {
+    const note = track.notes[i]
+    if (note.start > elapsed + 2000) break
+    if (note.start <= elapsed && elapsed < note.start + note.duration) {
+      const pitch = note.midiNote !== undefined ? note.midiNote : 48 + note.octave * 12 + NOTE_STEPS[note.index]
+      const label = track.instrument === 'drums'
+        ? DRUM_SOUNDS[note.index].name
+        : `${NOTE_NAMES[pitch % 12]}${Math.floor(pitch / 12) - 1}`
+      if (!labels.includes(label)) labels.push(label)
+    }
+  }
+  return labels.join(' · ') || '—'
 }
 
 function trackRange(notes: NoteEvent[]): string {
@@ -125,7 +201,7 @@ function trackRange(notes: NoteEvent[]): string {
   return `${label(pitches.reduce((lowest, pitch) => Math.min(lowest, pitch), Infinity))}–${label(pitches.reduce((highest, pitch) => Math.max(highest, pitch), -Infinity))}`
 }
 
-function restoreTracks(value: unknown): Track[] {
+function restoreTracks(value: unknown, withBars = true): Track[] {
   if (!Array.isArray(value)) throw new Error('Invalid tracks')
   return value.map((track, id) => {
     if (!track || !Array.isArray(track.notes) || !Number.isFinite(track.duration) || track.duration < 0) throw new Error('Invalid track')
@@ -146,7 +222,102 @@ function restoreTracks(value: unknown): Track[] {
     const duration = notes.length ? notes.reduce((end, note) => Math.max(end, note.start + note.duration), track.duration) : 0
     return { id, instrument: notes.length ? instrument!.id : null, name: notes.length ? instrument!.name : '',
       octaveLabel: trackRange(notes),
-      selected: false, duration, durationLabel: duration ? `${(duration / 1000).toFixed(1)}s` : '—', notes, bars: noteBars(notes, duration) }
+      selected: false, duration, durationLabel: duration ? `${(duration / 1000).toFixed(1)}s` : '—', notes, bars: withBars ? noteBars(notes, duration) : [] }
+  })
+}
+
+const BUILTIN_DEMO_METAS = [
+  { id: 'demo-moonboat-midi-v1', name: '月亮船(快乐星球)-王英姿', file: 'demo-moonboat.json', duration: 86994.792, durationLabel: '87.0s' },
+  { id: 'demo-doraemon-midi-v1', name: '哆啦A梦', file: 'demo-doraemon.json', duration: 173998.958, durationLabel: '174.0s' },
+  { id: 'demo-summer-midi-v1', name: '菊次郎的夏天-久石让', file: 'demo-summer.json', duration: 148241.029, durationLabel: '148.2s' },
+  { id: 'demo-boundless-midi-v1', name: '海阔天空-Beyond', file: 'demo-boundless.json', duration: 350180.804, durationLabel: '350.2s' },
+  { id: 'demo-zebra-midi-v1', name: '斑马斑马-宋冬野', file: 'demo-zebra.json', duration: 249942.024, durationLabel: '249.9s' },
+  { id: 'demo-lawrence-midi-v1', name: '战场上的圣诞节-坂本龙一', file: 'demo-lawrence.json', duration: 289227.708, durationLabel: '289.2s' },
+  { id: 'demo-nocturne-midi-v1', name: '夜曲-周杰伦', file: 'demo-nocturne.json', duration: 216741.476, durationLabel: '216.7s' },
+  { id: 'demo-rainbow-midi-v1', name: '彩虹-周杰伦', file: 'demo-rainbow.json', duration: 249193.892, durationLabel: '249.2s' },
+]
+
+const BUILTIN_DEMO_FILES: Record<string, string> = {
+  'demo-moonboat-midi-v1': 'demo-moonboat.json',
+  'demo-doraemon-midi-v1': 'demo-doraemon.json',
+  'demo-summer-midi-v1': 'demo-summer.json',
+  'demo-boundless-midi-v1': 'demo-boundless.json',
+  'demo-zebra-midi-v1': 'demo-zebra.json',
+  'demo-lawrence-midi-v1': 'demo-lawrence.json',
+  'demo-nocturne-midi-v1': 'demo-nocturne.json',
+  'demo-rainbow-midi-v1': 'demo-rainbow.json',
+}
+
+function loadFixture(filename: string, expectedId: string): any {
+  let fixture: any = null
+  const fsManager = (wx as any).getFileSystemManager ? (wx as any).getFileSystemManager() : null
+  if (fsManager && fsManager.readFileSync) {
+    const candidatePaths = [`assets/${filename}`, `/assets/${filename}`, filename]
+    for (let i = 0; i < candidatePaths.length; i++) {
+      try {
+        const text = fsManager.readFileSync(candidatePaths[i], 'utf8') as string
+        if (text) {
+          const parsed = JSON.parse(text)
+          if (parsed && parsed.id === expectedId) {
+            fixture = parsed
+            break
+          }
+        }
+      } catch (_) {}
+    }
+  }
+  if (!fixture) {
+    try {
+      if (typeof require === 'function') {
+        const req = require(`../../assets/${filename}`)
+        if (req && req.id === expectedId) fixture = req
+      }
+    } catch (_) {}
+  }
+  return fixture
+}
+
+function attachLazyTracks(mix: SavedMix, filename?: string, initialTracks?: Track[]) {
+  let cachedTracks: Track[] | null = initialTracks && initialTracks.length ? initialTracks : (Array.isArray(mix.tracks) && mix.tracks.length ? mix.tracks : null)
+  Object.defineProperty(mix, 'tracks', {
+    get() {
+      if (cachedTracks) return cachedTracks
+      const file = filename || BUILTIN_DEMO_FILES[mix.id]
+      if (file) {
+        const fixture = loadFixture(file, mix.id)
+        if (fixture && fixture.tracks) {
+          cachedTracks = restoreTracks(fixture.tracks, false)
+          return cachedTracks
+        }
+      }
+      return []
+    },
+    set(value) {
+      cachedTracks = value
+    },
+    enumerable: false,
+    configurable: true,
+  })
+  return mix
+}
+
+function serializeLibraryMixes(mixes: SavedMix[]) {
+  return mixes.map(mix => {
+    if (BUILTIN_DEMO_FILES[mix.id]) {
+      return {
+        id: mix.id,
+        name: mix.name,
+        duration: mix.duration,
+        durationLabel: mix.durationLabel,
+      }
+    }
+    return {
+      id: mix.id,
+      name: mix.name,
+      duration: mix.duration,
+      durationLabel: mix.durationLabel,
+      tracks: mix.tracks,
+    }
   })
 }
 
@@ -171,13 +342,18 @@ let libraryReturnState: {
   elapsedLabel: string; timelineSeconds: number; progress: number; scrollTrackIntoView: string;
 } | null = null
 let guideDemoTimer: ReturnType<typeof setInterval> | null = null
+let guideFinishTimer: ReturnType<typeof setTimeout> | null = null
 let guideDemoVoices: Voice[] = []
+let logoDemoTimer: ReturnType<typeof setInterval> | null = null
+let logoDemoVoices: Voice[] = []
 let soundTouchX = 0
 let touching = false
+let cachedPianoWave: any = null
+let cachedDrumWave: any = null
 
 Component({
   data: {
-    guideVisible: false, guideStep: 0, guideSteps: GUIDE_STEPS, guideDone: false, guideFeedback: '', guideDemoPlaying: false, guideExpectedKey: -1, guideRecording: false, guideSaving: false,
+    guideVisible: false, guideFading: false, guideStep: 0, guideSteps: GUIDE_STEPS, guideDone: false, guideFeedback: '', guideDemoPlaying: false, guideExpectedKey: -1, guideRecording: false, guideSaving: false,
     guideMasks: [] as GuideRect[], guideCardHeight: 260,
     guideRect: { left: 0, top: 0, width: 0, height: 0 }, guideCardTop: 100, guideCardBottom: -1,
     laneWidth: 240,
@@ -187,6 +363,7 @@ Component({
     instruments: INSTRUMENTS, soundPosition: 50, isSoundDragging: false,
     controlFlashes: { tone: 0, range: 0, metronome: 0 },
     screenGlitch: 0,
+    logoDemoPlaying: false, logoDemoKeys: [] as boolean[], logoDemoNoteLabels: [] as string[],
     padCells: PAD_CELLS,
     keys: Array.from({ length: 12 }, (_, index) => {
       const cell = PAD_CELLS.indexOf(index)
@@ -231,6 +408,7 @@ Component({
       if (!seen) this.startGuide()
     },
     detached() {
+      this.clearGuideFinish()
       this.stopGuideDemo()
       this.clearSaveEffect()
       this.stopMetronome()
@@ -293,6 +471,7 @@ Component({
       })
     },
     enterGuideStep(step: number) {
+      this.clearGuideFinish()
       if (GUIDE_STEPS[step].action === 'melody' && !this.data.isRecording) step = GUIDE_STEPS.findIndex(item => item.action === 'record')
       this.stopGuideDemo()
       if (this.data.guideRecording && !['melody', 'stop-record'].includes(GUIDE_STEPS[step].action)) {
@@ -300,7 +479,7 @@ Component({
         this.setData({ guideRecording: false })
       }
       this.onKeyEnd()
-      this.setData({ guideStep: step, guideDone: false, guideFeedback: '', guideDemoPlaying: false, guideExpectedKey: -1 }, () => {
+      this.setData({ guideStep: step, guideFading: false, guideDone: false, guideFeedback: '', guideDemoPlaying: false, guideExpectedKey: -1 }, () => {
         const action = GUIDE_STEPS[step].action
         if (action === 'record' || action === 'melody') {
           if (this.data.libraryOpen) this.closeLibrary()
@@ -327,6 +506,16 @@ Component({
     guideAction(action: string, feedback: string) {
       if (!this.data.guideVisible || GUIDE_STEPS[this.data.guideStep].action !== action) return
       this.setData({ guideDone: true, guideFeedback: feedback })
+      if (this.data.guideStep === GUIDE_STEPS.length - 1 && guideFinishTimer === null) {
+        guideFinishTimer = setTimeout(() => {
+          this.setData({ guideFading: true })
+          guideFinishTimer = setTimeout(() => this.finishGuide(), 350)
+        }, 1000)
+      }
+    },
+    clearGuideFinish() {
+      if (guideFinishTimer !== null) clearTimeout(guideFinishTimer)
+      guideFinishTimer = null
     },
     stopGuideDemo() {
       if (guideDemoTimer !== null) clearInterval(guideDemoTimer)
@@ -352,7 +541,7 @@ Component({
       })
       try {
         notes.forEach(note => {
-          guideDemoVoices.push(this.createVoice('piano', note.index, 1, false, start + note.start, note.duration, 0, 0, 1, 60 + note.index))
+          guideDemoVoices.push(this.createVoice('piano', note.index, 1, false, start + note.start, note.duration, 0, 0, 1, shiftedPitch(note.index, 1)))
         })
       } catch (_) {
         this.stopGuideDemo()
@@ -365,7 +554,7 @@ Component({
         if (this.data.guideRecording && this.data.isRecording) {
           const completed = notes.filter(note => elapsed >= note.start + note.duration)
           if (completed.length > recordedNotes) {
-            const added: NoteEvent[] = completed.slice(recordedNotes).map(note => ({ index: note.index, midiNote: 60 + note.index, start: recordingOffset + note.start * 1000, duration: note.duration * 1000, octave: 1, vibrato: false }))
+            const added: NoteEvent[] = completed.slice(recordedNotes).map(note => ({ index: note.index, midiNote: shiftedPitch(note.index, 1), start: recordingOffset + note.start * 1000, duration: note.duration * 1000, octave: 1, vibrato: false }))
             const tracks = this.data.tracks.map(track => track.id === this.data.recordingTrackId ? { ...track, notes: [...track.notes, ...added] } : track)
             recordedNotes = completed.length
             this.setData({ tracks })
@@ -379,23 +568,24 @@ Component({
         }
         const sounding = notes.find(note => elapsed >= note.start && elapsed < note.start + note.duration)
         const key = sounding ? sounding.index : undefined
-        this.setData({ guideExpectedKey: key === undefined ? -1 : key, activeNote: key === undefined ? '' : `${NOTE_NAMES[key]}4`, activeDrumIcon: '' })
+        this.setData({ guideExpectedKey: key === undefined ? -1 : key, activeNote: key === undefined ? '' : this.data.keys[key].pitchLabel, activeDrumIcon: '' })
       }, 40)
     },
     nextGuide() {
       if (GUIDE_STEPS[this.data.guideStep].action === 'melody' && !this.data.guideDone) { this.playGuideDemo(); return }
       if (!this.data.guideDone) return
-      if (this.data.guideStep === GUIDE_STEPS.length - 1) { this.finishGuide(); return }
+      if (this.data.guideStep === GUIDE_STEPS.length - 1) return
       this.enterGuideStep(this.data.guideStep + 1)
     },
     previousGuide() {
       if (this.data.guideStep > 0 && !this.data.isPlaying) this.enterGuideStep(this.data.guideStep - 1)
     },
     finishGuide() {
+      this.clearGuideFinish()
       this.stopGuideDemo()
       if (this.data.guideRecording) { this.stopRecording(); this.setData({ guideRecording: false }) }
       this.onKeyEnd()
-      this.setData({ guideVisible: false, guideSaving: false })
+      this.setData({ guideVisible: false, guideFading: false, guideSaving: false })
       try { wx.setStorageSync(GUIDE_KEY, true) } catch (_) {}
     },
     setupShareMenu() {
@@ -429,53 +619,55 @@ Component({
         const stored = wx.getStorageSync(LIBRARY_KEY)
         if (!stored) { this.setData({ savedMixes: [], midiDemoVersion: 0, libraryError: '' }); return }
         if (stored.version !== 1 || !Array.isArray(stored.mixes)) throw new Error('Invalid library')
-        const savedMixes: SavedMix[] = stored.mixes.map((mix: SavedMix) => {
+        const savedMixes: SavedMix[] = stored.mixes.map((mix: any) => {
           if (!mix || typeof mix.id !== 'string' || !mix.id || typeof mix.name !== 'string' || !mix.name.trim()) throw new Error('Invalid mix')
-          const tracks = restoreTracks(mix.tracks)
+          const builtin = BUILTIN_DEMO_METAS.find(item => item.id === mix.id)
+          if (builtin) {
+            const duration = mix.duration || builtin.duration
+            const durationLabel = mix.durationLabel || builtin.durationLabel
+            const item: SavedMix = { id: mix.id, name: mix.name, duration, durationLabel } as any
+            attachLazyTracks(item, builtin.file)
+            return item
+          }
+          const tracks = Array.isArray(mix.tracks) ? restoreTracks(mix.tracks, false) : []
           if (stored.soundLayoutVersion !== 2) tracks.forEach(track => {
             if (track.instrument === 'drums') {
               track.notes.forEach(note => { note.index %= 9 })
-              track.bars = noteBars(track.notes, track.duration)
             }
           })
-          const duration = Math.max(...tracks.map(track => track.duration))
-          if (!duration) throw new Error('Empty mix')
-          return { id: mix.id, name: mix.name, tracks, duration, durationLabel: `${(duration / 1000).toFixed(1)}s` }
+          const duration = mix.duration || Math.max(0, ...tracks.map(track => track.duration))
+          if (!duration && !tracks.length) throw new Error('Empty mix')
+          const durationLabel = mix.durationLabel || `${(duration / 1000).toFixed(1)}s`
+          const item: SavedMix = { id: mix.id, name: mix.name, duration, durationLabel } as any
+          attachLazyTracks(item, undefined, tracks)
+          return item
         })
-        this.setData({ savedMixes, midiDemoVersion: stored.midiDemoVersion === 2 ? 2 : 0, libraryError: '' })
+        this.setData({ savedMixes, midiDemoVersion: stored.midiDemoVersion === 10 ? 10 : 0, libraryError: '' })
       } catch (_) {
         this.setData({ libraryError: '音轨库读取失败，请重新打开应用后重试' })
       }
     },
     seedMidiMix() {
-      if (this.data.libraryError || this.data.midiDemoVersion === 2) return
+      if (this.data.libraryError || this.data.midiDemoVersion === 10) return
       try {
-        let fixture: any = null
-        const fsManager = wx.getFileSystemManager()
-        const candidatePaths = ['assets/demo-rainbow.json', '/assets/demo-rainbow.json']
-        for (let i = 0; i < candidatePaths.length; i++) {
-          try {
-            const text = fsManager.readFileSync(candidatePaths[i], 'utf8') as string
-            if (text) {
-              fixture = JSON.parse(text)
-              break
-            }
-          } catch (_) {}
-        }
-        if (!fixture) {
-          try {
-            if (typeof require === 'function') {
-              fixture = require('../../assets/demo-rainbow.json')
-            }
-          } catch (_) {}
-        }
-        if (!fixture) throw new Error('demo-rainbow.json not found')
-        const tracks = restoreTracks(fixture.tracks)
-        const duration = Math.max(...tracks.map(track => track.duration))
-        const mix: SavedMix = { id: fixture.id, name: fixture.name, tracks, duration, durationLabel: `${(duration / 1000).toFixed(1)}s` }
-        const savedMixes = [mix, ...this.data.savedMixes.filter(item => item.id !== mix.id && item.id !== 'demo-fathers-name-v1')]
-        wx.setStorageSync(LIBRARY_KEY, { version: 1, soundLayoutVersion: 2, demoVersion: DEMO_VERSION, midiDemoVersion: 2, mixes: savedMixes })
-        this.setData({ savedMixes, midiDemoVersion: 2 })
+        const demoMixes: SavedMix[] = BUILTIN_DEMO_METAS.map(meta => {
+          const item: SavedMix = {
+            id: meta.id,
+            name: meta.name,
+            duration: meta.duration,
+            durationLabel: meta.durationLabel,
+          } as any
+          attachLazyTracks(item, meta.file)
+          return item
+        })
+
+        const demoIds = new Set(demoMixes.map(mix => mix.id))
+        const savedMixes = [
+          ...demoMixes,
+          ...this.data.savedMixes.filter(item => !demoIds.has(item.id) && item.id !== 'demo-fathers-name-v1')
+        ]
+        wx.setStorageSync(LIBRARY_KEY, { version: 1, soundLayoutVersion: 2, demoVersion: DEMO_VERSION, midiDemoVersion: 10, mixes: serializeLibraryMixes(savedMixes) })
+        this.setData({ savedMixes, midiDemoVersion: 10 })
       } catch (err) {
         console.error('seedMidiMix failed:', err)
         wx.showToast({ title: 'MIDI测试音轨添加失败', icon: 'none' })
@@ -519,7 +711,7 @@ Component({
       if (!this.data.savedMixes.some(item => item.id === id)) return
       const savedMixes = this.data.savedMixes.filter(item => item.id !== id)
       try {
-        wx.setStorageSync(LIBRARY_KEY, { version: 1, soundLayoutVersion: 2, demoVersion: DEMO_VERSION, midiDemoVersion: this.data.midiDemoVersion, mixes: savedMixes })
+        wx.setStorageSync(LIBRARY_KEY, { version: 1, soundLayoutVersion: 2, demoVersion: DEMO_VERSION, midiDemoVersion: this.data.midiDemoVersion, mixes: serializeLibraryMixes(savedMixes) })
         if (this.data.selectedMixId === id) this.pauseSession()
         this.setData({ savedMixes, selectedMixId: this.data.selectedMixId === id ? '' : this.data.selectedMixId })
         this.closeMixSwipe()
@@ -531,23 +723,32 @@ Component({
       if (this.data.isRecording || this.data.showSaveDialog || this.data.libraryOpen) return
       this.pauseSession()
       libraryReturnState = {
-        tracks: JSON.parse(JSON.stringify(this.data.tracks)), hasTracks: this.data.hasTracks,
-        hasSelectedTracks: this.data.hasSelectedTracks, selectedMixId: this.data.selectedMixId,
-        elapsedLabel: this.data.elapsedLabel, timelineSeconds: this.data.timelineSeconds,
-        progress: this.data.progress, scrollTrackIntoView: this.data.scrollTrackIntoView,
+        tracks: this.data.tracks.map(track => ({
+          ...track,
+          notes: track.notes ? track.notes.map(n => ({ ...n })) : [],
+          bars: track.bars ? track.bars.map(b => ({ ...b })) : [],
+        })),
+        hasTracks: this.data.hasTracks,
+        hasSelectedTracks: this.data.hasSelectedTracks,
+        selectedMixId: this.data.selectedMixId,
+        elapsedLabel: this.data.elapsedLabel,
+        timelineSeconds: this.data.timelineSeconds,
+        progress: this.data.progress,
+        scrollTrackIntoView: this.data.scrollTrackIntoView,
       }
-      this.loadLibrary()
-      padRect = null
+      if (!this.data.savedMixes.length && !this.data.libraryError) {
+        this.loadLibrary()
+      }
       this.setData({ libraryOpen: true, isScreenMoving: false, selectedMixId: '' })
     },
     closeLibrary() {
       if (!this.data.libraryOpen) return
       this.pauseSession()
-      padRect = null
       this.closeMixSwipe()
       const restored = libraryReturnState
       libraryReturnState = null
       this.setData({ ...restored, libraryOpen: false, isScreenMoving: false, libraryLift: false,
+        controlFlashes: { tone: 0, range: 0, metronome: 0 },
         playbackProgress: (restored ? restored.tracks : this.data.tracks).map(() => -1),
       }, () => this.measureKeys())
     },
@@ -584,9 +785,10 @@ Component({
         const tracks = restoreTracks(this.data.tracks)
         const duration = Math.max(...tracks.map(track => track.duration))
         if (!duration) { this.setData({ saveError: '请先录制音轨' }); return }
-        const mix: SavedMix = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`, name, tracks, duration, durationLabel: `${(duration / 1000).toFixed(1)}s` }
+        const mix: SavedMix = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`, name, duration, durationLabel: `${(duration / 1000).toFixed(1)}s` } as any
+        attachLazyTracks(mix, undefined, tracks)
         const savedMixes = [mix, ...this.data.savedMixes]
-        wx.setStorageSync(LIBRARY_KEY, { version: 1, soundLayoutVersion: 2, demoVersion: DEMO_VERSION, midiDemoVersion: this.data.midiDemoVersion, mixes: savedMixes })
+        wx.setStorageSync(LIBRARY_KEY, { version: 1, soundLayoutVersion: 2, demoVersion: DEMO_VERSION, midiDemoVersion: this.data.midiDemoVersion, mixes: serializeLibraryMixes(savedMixes) })
         const continueGuide = this.data.guideSaving
         this.setData({
           savedMixes, selectedMixId: '', showSaveDialog: false, saveName: '', saveError: '',
@@ -625,11 +827,61 @@ Component({
     triggerScreenGlitch() {
       this.setData({ screenGlitch: this.data.screenGlitch + 1 })
     },
+    playLogoDemo() {
+      if (this.data.isRecording || this.data.isPlaying || this.data.guideVisible || this.data.showSaveDialog) return
+      this.onKeyEnd()
+      this.stopVoices()
+      const audio = this.getAudioContext()
+      if (!audio) return
+      const instrument = this.data.instrument
+      const octave = this.data.octaveIndex
+      const beat = 60 / (this.data.metronomeBpm || 100)
+      const start = audio.currentTime + .05
+      const notes = LOGO_DEMOS[instrument].map(([pitch, at, length]) => {
+        const key = instrument === 'drums' ? pitch : pitch % 12
+        const index = instrument === 'drums' ? DRUM_KEY_ORDER[key] : key
+        return { key, index, midiNote: instrument === 'drums' ? undefined : shiftedPitch(pitch, octave), at: at * beat,
+          duration: instrument === 'drums' ? DRUM_SOUNDS[index].duration : length * beat }
+      })
+      try {
+        notes.forEach(note => logoDemoVoices.push(this.createVoice(instrument, note.index, octave, instrument === 'synth', start + note.at,
+          note.duration, instrument === 'synth' ? VIBRATO_READY : 0, 0, .85, note.midiNote)))
+      } catch (_) {
+        this.stopLogoDemo()
+        wx.showToast({ title: '示范暂时无法播放，请重试', icon: 'none' })
+        return
+      }
+      const end = Math.max(...notes.map(note => note.at + note.duration)) + .18
+      this.triggerScreenGlitch()
+      this.setData({ logoDemoPlaying: true, logoDemoKeys: [], logoDemoNoteLabels: [] })
+      logoDemoTimer = setInterval(() => {
+        const elapsed = audio.currentTime - start
+        if (elapsed >= end) { this.stopLogoDemo(); return }
+        const logoDemoKeys = Array.from({ length: 12 }, (_, key) => notes.some(note => note.key === key && elapsed >= note.at && elapsed < note.at + note.duration))
+        const logoDemoNoteLabels = Array.from({ length: 12 }, (_, key) => {
+          const note = notes.find(note => note.key === key && elapsed >= note.at && elapsed < note.at + note.duration)
+          return note && note.midiNote !== undefined ? `${NOTE_NAMES[note.midiNote % 12]}${Math.floor(note.midiNote / 12) - 1}` : ''
+        })
+        this.setData({ logoDemoKeys, logoDemoNoteLabels })
+      }, 25)
+    },
+    stopLogoDemo() {
+      if (logoDemoTimer !== null) clearInterval(logoDemoTimer)
+      logoDemoTimer = null
+      logoDemoVoices.forEach(voice => voice.stop())
+      logoDemoVoices = []
+      if (this.data.logoDemoPlaying) this.setData({ logoDemoPlaying: false, logoDemoKeys: [], logoDemoNoteLabels: [] })
+    },
     finishScreenGlitch() {
       this.setData({ screenGlitch: 0 })
     },
     flashScreenControl(control: 'tone' | 'range' | 'metronome') {
       this.setData({ controlFlashes: { ...this.data.controlFlashes, [control]: this.data.controlFlashes[control] + 1 } })
+    },
+    finishScreenControlFlash(event: WechatMiniprogram.BaseEvent) {
+      const control = event.currentTarget.dataset.control
+      if (control !== 'tone' && control !== 'range' && control !== 'metronome') return
+      this.setData({ controlFlashes: { ...this.data.controlFlashes, [control]: 0 } })
     },
     setOctave(index: number) {
       if (!Number.isInteger(index) || index < 0 || index > 2 || index === this.data.octaveIndex) return
@@ -813,6 +1065,7 @@ Component({
     },
     onPadStart(event: WechatMiniprogram.TouchEvent) {
       if (this.data.libraryOpen || this.data.isScreenMoving || this.data.showSaveDialog) return
+      this.stopLogoDemo()
       touching = true
       if (!padRect) {
         this.createSelectorQuery().select('.touch-disc').boundingClientRect().exec(results => {
@@ -826,6 +1079,7 @@ Component({
       this.handlePadTouches(event, false)
     },
     onKeyEnd(event?: WechatMiniprogram.TouchEvent) {
+      this.stopLogoDemo()
       if (!event || !event.touches || !event.touches.length) {
         touching = false
         this.releaseKey()
@@ -878,6 +1132,8 @@ Component({
       try {
         if (!context) {
           context = (wx as any).createWebAudioContext()
+          cachedPianoWave = null
+          cachedDrumWave = null
           masterGain = context.createGain()
           masterGain.gain.value = 2.8
           masterGain.connect(context.destination)
@@ -904,19 +1160,19 @@ Component({
       const sources: any[] = []
       const nodes: any[] = [filter, gain]
       if (noisy) {
-        // Dense, phase-scattered harmonics on two unrelated fundamentals approximate
-        // noise without AudioBuffer or any file decoding on the native audio bridge.
-        const real = new Float32Array(257)
-        const imag = new Float32Array(257)
-        for (let harmonic = 1; harmonic < imag.length; harmonic++) {
-          const phase = harmonic * harmonic * 2.399963
-          real[harmonic] = Math.cos(phase)
-          imag[harmonic] = Math.sin(phase)
+        if (!cachedDrumWave) {
+          const real = new Float32Array(257)
+          const imag = new Float32Array(257)
+          for (let harmonic = 1; harmonic < imag.length; harmonic++) {
+            const phase = harmonic * harmonic * 2.399963
+            real[harmonic] = Math.cos(phase)
+            imag[harmonic] = Math.sin(phase)
+          }
+          cachedDrumWave = context.createPeriodicWave(real, imag)
         }
-        const wave = context.createPeriodicWave(real, imag)
         for (const ratio of [1, 1.481]) {
           const noise = context.createOscillator()
-          noise.setPeriodicWave(wave)
+          noise.setPeriodicWave(cachedDrumWave)
           noise.frequency.setValueAtTime(sound.frequency * .137 * ratio, when)
           noise.connect(filter)
           sources.push(noise)
@@ -993,9 +1249,12 @@ Component({
       const gain = context.createGain()
       const naturalLength = Math.max(1.2, Math.min(4, 3 * Math.sqrt(261.63 / frequency)))
       const length = Math.max(.01, Math.min(duration === undefined ? naturalLength : duration, naturalLength))
-      source.setPeriodicWave(context.createPeriodicWave(
-        new Float32Array(9), new Float32Array([0, 1, .45, .22, .12, .07, .04, .025, .015]),
-      ))
+      if (!cachedPianoWave) {
+        cachedPianoWave = context.createPeriodicWave(
+          new Float32Array(9), new Float32Array([0, 1, .45, .22, .12, .07, .04, .025, .015]),
+        )
+      }
+      source.setPeriodicWave(cachedPianoWave)
       source.frequency.setValueAtTime(frequency, when)
       filter.type = 'lowpass'
       filter.Q.value = .5
@@ -1028,12 +1287,13 @@ Component({
       filter.Q.value = .7
       // Keep the full square-wave body with vibrato on or off.
       // Speaker-like rolloff softens the edge without thinning the fundamental.
-      filter.frequency.setValueAtTime(3200, when)
+      const isBass = frequency < 140
+      filter.frequency.setValueAtTime(isBass ? Math.min(1200, Math.max(500, frequency * 7)) : 3200, when)
       // Broad midrange resonance approximates a small speaker's nasal body.
       body.type = 'peaking'
-      body.frequency.setValueAtTime(900, when)
+      body.frequency.setValueAtTime(isBass ? Math.min(400, frequency * 2) : 900, when)
       body.Q.value = .65
-      body.gain.value = 3
+      body.gain.value = isBass ? 0 : 3
       lead.connect(body)
       body.connect(filter)
       filter.connect(gain)
@@ -1091,7 +1351,12 @@ Component({
         voice.release = () => { if (open) { gate(0, .018); open = false } }
         voice.retune = (nextIndex, octave, enabled, age, nextMidiNote) => {
           const now = context.currentTime
-          lead.frequency.setValueAtTime(nextMidiNote === undefined ? FREQUENCIES[nextIndex] * [0.5, 1, 2][octave] : 440 * Math.pow(2, (nextMidiNote - 69) / 12), now)
+          const nextFreq = nextMidiNote === undefined ? FREQUENCIES[nextIndex] * [0.5, 1, 2][octave] : 440 * Math.pow(2, (nextMidiNote - 69) / 12)
+          lead.frequency.setValueAtTime(nextFreq, now)
+          const isNextBass = nextFreq < 140
+          filter.frequency.setValueAtTime(isNextBass ? Math.min(1200, Math.max(500, nextFreq * 7)) : 3200, now)
+          body.frequency.setValueAtTime(isNextBass ? Math.min(400, nextFreq * 2) : 900, now)
+          body.gain.value = isNextBass ? 0 : 3
           if (enabled || enabled !== effectOn) { setDepth(enabled, age, now); effectOn = enabled }
           if (!open) { gate(level, .003); open = true }
         }
@@ -1112,18 +1377,41 @@ Component({
         : Math.max(0, Math.max(0, Date.now() - startedAt) - note.start)
       if (note.duration <= 0) return
       const tracks = this.data.tracks.map(track => track.id === this.data.recordingTrackId ? { ...track, notes: [...track.notes, note] } : track)
-      this.setData({ tracks })
-      this.updateRecording()
+      this.data.tracks = tracks
+      this.updateRecording(true)
     },
-    updateRecording() {
+    updateRecording(forceTracks = false) {
       const elapsed = Math.max(0, Date.now() - startedAt)
-      const tracks = this.data.tracks.map(track => {
-        if (track.id !== this.data.recordingTrackId) return track
+      const durationLabel = `${(elapsed / 1000).toFixed(1)}s`
+      const timelineSeconds = Math.max(TIMELINE_MIN_DURATION, elapsed) / 1000
+      const progress = elapsed / Math.max(TIMELINE_MIN_DURATION, elapsed) * 100
+
+      const trackIndex = this.data.tracks.findIndex(track => track.id === this.data.recordingTrackId)
+      if (trackIndex < 0) return
+
+      const track = this.data.tracks[trackIndex]
+      track.duration = elapsed
+      track.durationLabel = durationLabel
+
+      if (pendingNote || forceTracks) {
         const notes = pendingNote ? [...track.notes, { ...pendingNote, duration: elapsed - pendingNote.start }] : track.notes
         const octaveLabel = trackRange(notes) || track.octaveLabel
-        return { ...track, octaveLabel, duration: elapsed, durationLabel: `${(elapsed / 1000).toFixed(1)}s`, bars: noteBars(notes, elapsed) }
-      })
-      this.setData({ tracks, timelineSeconds: Math.max(TIMELINE_MIN_DURATION, elapsed) / 1000, progress: elapsed / Math.max(TIMELINE_MIN_DURATION, elapsed) * 100, elapsedLabel: `${(elapsed / 1000).toFixed(1)}s` })
+        const bars = noteBars(notes, elapsed)
+        track.octaveLabel = octaveLabel
+        track.bars = bars
+        this.setData({
+          tracks: this.data.tracks,
+          timelineSeconds,
+          progress,
+          elapsedLabel: durationLabel,
+        })
+      } else {
+        this.setData({
+          timelineSeconds,
+          progress,
+          elapsedLabel: durationLabel,
+        })
+      }
     },
     toggleRecording() {
       if (this.data.isRecording) {
@@ -1163,18 +1451,18 @@ Component({
       this.setData({ isRecording: true, timelineSeconds: TIMELINE_MIN_DURATION / 1000, selectedMixId: '', recordingTrackId: target.id, scrollTrackIntoView: `track-${target.id}`, progress: 0, elapsedLabel: '0.0s', tracks, hasTracks: tracks.some(track => track.notes.length > 0) })
       timer = setInterval(() => {
         this.updateRecording()
-      }, 80)
+      }, 100)
     },
     stopRecording() {
       if (!this.data.isRecording) return
       this.vibrate('medium')
       this.onKeyEnd()
-      this.updateRecording()
       this.clearTimer()
+      const elapsed = Math.max(0, Date.now() - startedAt)
       const tracks = this.data.tracks.map(track => {
         if (track.id !== this.data.recordingTrackId) return track
-        const duration = track.notes.reduce((end, note) => Math.max(end, note.start + note.duration), track.duration)
-        if (!track.notes.length) return { ...track, instrument: null, name: '', octaveLabel: '', duration: 0, durationLabel: '—', selected: false }
+        const duration = track.notes.reduce((end, note) => Math.max(end, note.start + note.duration), elapsed)
+        if (!track.notes.length) return { ...track, instrument: null, name: '', octaveLabel: '', duration: 0, durationLabel: '—', selected: false, bars: [] }
         return { ...track, duration, durationLabel: `${(duration / 1000).toFixed(1)}s`, bars: noteBars(track.notes, duration) }
       })
       this.setData({ isRecording: false, recordingTrackId: -1, tracks, hasTracks: tracks.some(track => track.notes.length > 0) })
@@ -1231,26 +1519,46 @@ Component({
       const when = audio.currentTime + .05
       const span = Math.max(TIMELINE_MIN_DURATION, ...tracks.map(track => track.duration))
       const duration = Math.max(...tracks.map(track => track.duration + (track.instrument === 'piano' ? 180 : track.instrument === 'synth' ? 18 : 0)))
+      const totalNotes = tracks.reduce((sum, track) => sum + track.notes.length, 0)
+      const useLookahead = totalNotes > 100
+      const LOOKAHEAD_SEC = 2.5
+      const nextNoteIndices = tracks.map(() => 0)
+
+      const scheduleNotes = (horizonSec: number) => {
+        tracks.forEach((track, tIdx) => {
+          let nIdx = nextNoteIndices[tIdx]
+          while (nIdx < track.notes.length) {
+            const note = track.notes[nIdx]
+            if (note.start / 1000 > horizonSec) break
+            playbackVoices.push(this.createVoice(
+              track.instrument!,
+              note.index,
+              note.octave,
+              note.vibrato,
+              when + note.start / 1000,
+              note.duration / 1000,
+              note.vibratoAge !== undefined ? note.vibratoAge : VIBRATO_READY,
+              note.vibratoPhase !== undefined ? note.vibratoPhase : 0,
+              note.velocity !== undefined ? note.velocity : 1,
+              note.midiNote
+            ))
+            nIdx++
+          }
+          nextNoteIndices[tIdx] = nIdx
+        })
+      }
+
       try {
-        tracks.forEach(track => track.notes.forEach(note => {
-          playbackVoices.push(this.createVoice(
-            track.instrument!,
-            note.index,
-            note.octave,
-            note.vibrato,
-            when + note.start / 1000,
-            note.duration / 1000,
-            note.vibratoAge !== undefined ? note.vibratoAge : VIBRATO_READY,
-            note.vibratoPhase !== undefined ? note.vibratoPhase : 0,
-            note.velocity !== undefined ? note.velocity : 1,
-            note.midiNote
-          ))
-        }))
+        scheduleNotes(useLookahead ? LOOKAHEAD_SEC : Infinity)
       } catch (_) {
         this.stopPlayback()
         this.stopVoices()
         wx.showToast({ title: '播放失败，请重试', icon: 'none' })
         return
+      }
+      if (masterGain) {
+        const mixFactor = Math.max(1, Math.sqrt(tracks.length * 0.55))
+        masterGain.gain.setValueAtTime(2.8 / mixFactor, when)
       }
       this.setData({ ...(fromLibrary ? { isScreenMoving: false, libraryLift: false } : {}), isPlaying: true, timelineSeconds: span / 1000, progress: 0, playbackProgress: this.data.tracks.map(track => track.notes.length ? 0 : -1), elapsedLabel: '0.0s' }, () => {
         if (fromLibrary) { padRect = null; this.measureKeys() }
@@ -1260,6 +1568,11 @@ Component({
       playbackTimer = setInterval(() => {
         if (!this.data.isPlaying) return
         const elapsed = Math.max(0, (audio.currentTime - when) * 1000)
+        if (useLookahead) {
+          try {
+            scheduleNotes(audio.currentTime - when + LOOKAHEAD_SEC)
+          } catch (_) {}
+        }
         const playbackProgress = this.data.tracks.map(track => {
           if (!tracks.some(playing => playing.id === track.id) || elapsed >= track.duration) return -1
           return elapsed / Math.max(TIMELINE_MIN_DURATION, track.duration) * 100
@@ -1274,13 +1587,16 @@ Component({
         })
         this.setData({ playbackProgress, playbackNoteLabels, playbackDrumIcons, ...(!this.data.isRecording ? { progress: Math.min(100, elapsed / span * 100), elapsedLabel: `${(Math.min(elapsed, duration) / 1000).toFixed(1)}s`, timelineSeconds: span / 1000 } : {}) })
         if (elapsed >= duration + 40) this.stopPlayback()
-      }, 25)
+      }, 50)
     },
     stopPlayback() {
       if (playbackTimer !== null) clearInterval(playbackTimer)
       playbackTimer = null
       playbackVoices.forEach(voice => voice.stop())
       playbackVoices = []
+      if (masterGain && context) {
+        try { masterGain.gain.setValueAtTime(2.8, context.currentTime) } catch (_) {}
+      }
       this.setData({ isPlaying: false, playbackNoteLabels: [], playbackDrumIcons: [], ...(!this.data.isRecording ? { progress: 0 } : {}), playbackProgress: this.data.tracks.map(() => -1) })
     },
     clearTimer() { if (timer !== null) clearInterval(timer); timer = null },

@@ -14,7 +14,7 @@ assert.equal(sandbox.playingNoteLabel(track, 100), 'C4')
 assert.equal(sandbox.playingNoteLabel(track, 150), 'C4 · E4')
 assert.equal(sandbox.playingNoteLabel(track, 250), 'C4')
 assert.equal(sandbox.playingNoteLabel(track, 300), '—')
-assert.equal(sandbox.playingNoteLabel({ instrument: 'synth', notes: [{ index: 6, octave: 1, start: 0, duration: 100 }] }, 0), 'C4')
+assert.equal(sandbox.playingNoteLabel({ instrument: 'synth', notes: [{ index: 0, octave: 1, start: 0, duration: 100 }] }, 0), 'C4')
 assert.equal(sandbox.playingNoteLabel({ instrument: 'drums', notes: [{ index: 8, start: 0, duration: 100 }] }, 0), '底鼓')
 console.log('PASS: real-time notes, chords, rests, note boundaries, legacy pitches and drum names')
 
